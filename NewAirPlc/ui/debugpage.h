@@ -139,6 +139,9 @@ private:
 
     // 初始化界面和定时器
     void initUI();
+    
+    // 初始化所有开关按钮状态
+    void initializeSwitchButtons();
 
     // 显示操作反馈
     void showFeedback(const QString &operation);

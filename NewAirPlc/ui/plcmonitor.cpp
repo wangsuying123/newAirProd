@@ -114,12 +114,13 @@ void PlcMonitor::updatePlcData()
     
     // 批次1：读取 HoldingRegisters 400,402,404 —— 注意400/402/404不连续(间隔2)，
     // 为简化，分别发起3个独立异步请求（但不再阻塞）
-    int pendingBatches = 3;
+    // 使用shared_ptr确保计数器在异步回调中仍然有效
+    std::shared_ptr<int> pendingBatches = std::make_shared<int>(3);
     
     // 使用计数器，当3个批次全部完成时释放 m_plcBusy
-    auto onBatchDone = [this, &pendingBatches]() {
-        pendingBatches--;
-        if (pendingBatches <= 0) {
+    auto onBatchDone = [this, pendingBatches]() {
+        (*pendingBatches)--;
+        if (*pendingBatches <= 0) {
             m_plcBusy = false;
             // 刷新UI显示
             updateStatistics();
@@ -542,23 +543,17 @@ void PlcMonitor::readCoilsAsync(quint16 startAddress, quint16 count,
 void PlcMonitor::updateConnectionStatus(bool isConnected)
 {
     m_isConnected = isConnected;
-    logMessage(QString("PLC监控页面连接状态更新: %1").arg(m_isConnected ? "已连接" : "未连接"), "info");
-    if (m_isConnected) {
-        logMessage("PLC连接成功", "success");
-    } else {
-        logMessage("PLC连接断开", "error");
+    if (isConnected) {
+        // 连接成功时重置 busy 标志，确保数据更新可以正常进行
+        m_plcBusy = false;
     }
+    logMessage(QString("PLC监控页面连接状态更新: %1").arg(m_isConnected ? "已连接" : "未连接"), "info");
 }
 
 void PlcMonitor::updateAirtightConnectionStatus(bool isConnected)
 {
     m_isAirtightConnected = isConnected;
     logMessage(QString("气密仪连接状态更新: %1").arg(m_isAirtightConnected ? "已连接" : "未连接"), "info");
-    if (m_isAirtightConnected) {
-        logMessage("气密仪连接成功", "success");
-    } else {
-        logMessage("气密仪连接断开", "error");
-    }
 }
 
 void PlcMonitor::updatePressureConnectionStatus(bool isConnected)
@@ -570,76 +565,76 @@ void PlcMonitor::updatePressureConnectionStatus(bool isConnected)
     qDebug() << "PlcMonitor::updatePressureConnectionStatus 被调用，状态:" << (isConnected ? "已连接" : "未连接");
 }
 
-bool PlcMonitor::writeAirtightRegister(quint16 address, quint16 value)
+void PlcMonitor::writeAirtightRegister(quint16 address, quint16 value, const std::function<void(bool)>& callback)
 {
     if (!m_airtightModbusClient || !m_isAirtightConnected) {
         qDebug() << "无法写入气密仪寄存器: 气密仪未连接";
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 创建写入单元
     QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, address, 2);
     writeUnit.setValue(0, value);
-    writeUnit.setValue(1, 0); // 第二个寄存器设为0，确保使用功能码16
+    writeUnit.setValue(1, 0);
     
-    // 发送写入请求
     QModbusReply *reply = m_airtightModbusClient->sendWriteRequest(writeUnit, m_airtightDeviceAddress);
     if (!reply) {
         qDebug() << QString("发送写入气密仪请求失败: %1").arg(m_airtightModbusClient->errorString());
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 等待回复或超时
-    QEventLoop loop;
-    QTimer timer;
-    timer.setSingleShot(true);
-    
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    
-    timer.start(3000);
-    loop.exec();
+    QPointer<QModbusReply> replyGuard(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(3000);
 
-    // 处理回复
-    bool success = false;
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-        
-        if (reply->error() == QModbusDevice::NoError) {
+    connect(timeoutTimer, &QTimer::timeout, this, [this, address, callback, replyGuard, timeoutTimer]() {
+        if (replyGuard) {
+            logMessage(QString("写入气密仪数据超时，地址: %1").arg(address), "error");
+            replyGuard->deleteLater();
+        }
+        if (callback) callback(false);
+        timeoutTimer->deleteLater();
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, address, value, callback, replyGuard, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        if (!replyGuard) {
+            if (callback) callback(false);
+            return;
+        }
+        bool success = false;
+        if (replyGuard->error() == QModbusDevice::NoError) {
             success = true;
         } else {
-            logMessage(QString("写入气密仪数据失败: %1, 地址: %2, 值: %3").arg(reply->errorString()).arg(address).arg(value), "error");
+            logMessage(QString("写入气密仪数据失败: %1, 地址: %2, 值: %3").arg(replyGuard->errorString()).arg(address).arg(value), "error");
         }
-        
-        reply->deleteLater();
-    } else {
-        // 超时
-        logMessage(QString("写入气密仪数据超时，地址: %1").arg(address), "error");
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        reply->deleteLater();
-    }
+        replyGuard->deleteLater();
+        if (callback) callback(success);
+    });
 
-    return success;
+    timeoutTimer->start();
 }
 
-int PlcMonitor::readInstrumentSelection()
+void PlcMonitor::readInstrumentSelection(const std::function<void(int)>& callback)
 {
     if (!m_modbusClient || m_modbusClient->state() != QModbusDevice::ConnectedState) {
         logMessage("PLC未连接，无法读取仪器评选数据", "error");
-        return -1; // 返回-1表示读取失败
+        if (callback) callback(-1);
+        return;
     }
     
-    quint16 value;
-    // 从寄存器110读取数据，使用功能码03（Holding Registers）
-    if (!readRegisterBlocking(110, value, QModbusDataUnit::HoldingRegisters)) {
-        logMessage("读取仪器评选数据失败（寄存器110）", "error");
-        return -1;
-    }
-    
-    // 记录读取到的仪器评选数据
-    logMessage(QString("读取到的仪器评选数据: %1").arg(value), "info");
-    return value;
+    readRegisterAsync(110, QModbusDataUnit::HoldingRegisters, [this, callback](bool success, quint16 value) {
+        if (!success) {
+            logMessage("读取仪器评选数据失败（寄存器110）", "error");
+            if (callback) callback(-1);
+            return;
+        }
+        logMessage(QString("读取到的仪器评选数据: %1").arg(value), "info");
+        if (callback) callback(static_cast<int>(value));
+    });
 }
 
 bool PlcMonitor::readRegisterBlocking(quint16 address, quint16& value, QModbusDataUnit::RegisterType type) {
@@ -691,77 +686,64 @@ bool PlcMonitor::readRegisterBlocking(quint16 address, quint16& value, QModbusDa
     return success;
 }
 
-bool PlcMonitor::sendParamsToDevice(const AirTightnessFullParams& params)
+void PlcMonitor::sendParamsToDevice(const AirTightnessFullParams& params, const std::function<void(bool)>& callback)
 {
     if (!m_airtightModbusClient || m_airtightModbusClient->state() != QModbusDevice::ConnectedState) {
         logMessage("未连接到气密仪设备，无法发送参数", "error");
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
     logMessage("开始准备参数发送到设备", "info");
     
-    const int timeoutMs = 3000; // 单个命令超时时间，增加到3秒避免通信繁忙时超时
-    const quint16 startAddress = 8192; // 起始地址
-    const quint16 endAddress = 8229;   // 结束地址
-    const int numRegisters = endAddress - startAddress + 1; // 寄存器数量
+    const int timeoutMs = 3000;
+    const quint16 startAddress = 8192;
+    const quint16 endAddress = 8229;
+    const int numRegisters = endAddress - startAddress + 1;
     
-    // 先发送地址8192,值为1的命令，通知设备准备接收参数
     logMessage("发送参数准备命令", "info");
     
-    // 等待设备准备
-    QThread::msleep(500);
-    
-    // 创建批量写入数据单元，从8192到8229共38个寄存器
     QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, startAddress, numRegisters);
     
-    // 初始化所有寄存器值为0
     for (int i = 0; i < numRegisters; ++i) {
         writeUnit.setValue(i, 0);
     }
     
-    // 发送程序号（使用未使用的地址8193）
     writeUnit.setValue(8192 - startAddress, 26112);
     writeUnit.setValue(8193 - startAddress, 0);
     logMessage(QString("程序号: %1").arg(params.programNumber), "info");
     
-     // 1. 时间参数：保持编码逻辑不变，但保留无符号编码值
-    auto encodeTime = [](double n) -> quint16 {  // 返回无符号类型
+    auto encodeTime = [](double n) -> quint16 {
         if (n < 0.0) n = 0.0;
         if (n > 200.0) n = 200.0;
         quint16 value = static_cast<quint16>(std::round(n * 100.0));
         quint16 low = static_cast<quint16>(value & 0xFFu);
         quint16 high = static_cast<quint16>((value >> 8) & 0xFFu);
-        return static_cast<quint16>((low << 8) | high);  // 返回无符号编码值
+        return static_cast<quint16>((low << 8) | high);
     };
 
-    // 2. 编码得到无符号值（直接用于写入寄存器）
     quint16 fillTime = encodeTime(params.cycleTime.fillTime);
     quint16 stabilizationTime = encodeTime(params.cycleTime.stabilizationTime);
     quint16 testTime = encodeTime(params.cycleTime.testTime);
     quint16 dumpTime = encodeTime(params.cycleTime.dumpTime);
 
-    // 3. 以无符号类型写入寄存器（关键修改：确保setValue接受quint16）
-    // 若writeUnit.setValue支持无符号参数，直接传入：
-    writeUnit.setValue(8196 - startAddress, fillTime);        // 填充时间（无符号）
-    writeUnit.setValue(8197 - startAddress, stabilizationTime); // 稳定时间（无符号）
-    writeUnit.setValue(8198 - startAddress, testTime);         // 测试时间（无符号）
-    writeUnit.setValue(8199 - startAddress, dumpTime);         // 排放时间（无符号）
+    writeUnit.setValue(8196 - startAddress, fillTime);
+    writeUnit.setValue(8197 - startAddress, stabilizationTime);
+    writeUnit.setValue(8198 - startAddress, testTime);
+    writeUnit.setValue(8199 - startAddress, dumpTime);
 
-    // 4. 日志输出（保持不变，显示无符号值）
     logMessage(QString("时间参数(编码): 填充=%1, 稳定=%2, 测试=%3, 排放=%4")
         .arg(fillTime).arg(stabilizationTime).arg(testTime).arg(dumpTime));
 
-    // 2. 压力单位
-    writeUnit.setValue(8200 - startAddress, static_cast<quint16>(params.pressure.unitIndex));   // 压力单位
+    writeUnit.setValue(8200 - startAddress, static_cast<quint16>(params.pressure.unitIndex));
     logMessage(QString("压力单位代码: %1").arg(params.pressure.unitIndex), "info");
 
-    // 3. 压力值参数（双寄存器写入：8201/8202，8203/8204，8205/8206）
     auto swap16 = [](quint16 v) -> quint16 { return static_cast<quint16>((v << 8) | (v >> 8)); };
     auto encodePressure = [&](quint16 n) -> QPair<quint16, quint16> {
-        quint32 raw = static_cast<quint32>(n) * 1000u; // 例如 n=70 -> 70000 (0x00011170)
-        quint16 low = static_cast<quint16>(raw & 0xFFFFu);       // 低16位，如0x1170
-        quint16 high = static_cast<quint16>((raw >> 16) & 0xFFFFu); // 高16位，如0x0001
-        return qMakePair(swap16(low), swap16(high)); // 字节交换：0x1170->0x7011, 0x0001->0x0100
+        quint32 raw = static_cast<quint32>(n) * 1000u;
+        quint16 low = static_cast<quint16>(raw & 0xFFFFu);
+        quint16 high = static_cast<quint16>((raw >> 16) & 0xFFFFu);
+        return qMakePair(swap16(low), swap16(high));
     };
     quint16 minPressure = static_cast<quint16>(params.pressure.minimum);
     quint16 maxPressure = static_cast<quint16>(params.pressure.maximum);
@@ -771,77 +753,55 @@ bool PlcMonitor::sendParamsToDevice(const AirTightnessFullParams& params)
     QPair<quint16, quint16> maxEnc = encodePressure(maxPressure);
     QPair<quint16, quint16> fillEnc = encodePressure(fillPressure);
 
-    // 最小压力: 写入8201(低位交换) / 8202(高位交换)
     writeUnit.setValue(8201 - startAddress, minEnc.first);
     writeUnit.setValue(8202 - startAddress, minEnc.second);
-    // 最大压力: 写入8203 / 8204
     writeUnit.setValue(8203 - startAddress, maxEnc.first);
     writeUnit.setValue(8204 - startAddress, maxEnc.second);
-    // 填充压力: 写入8205 / 8206
     writeUnit.setValue(8205 - startAddress, fillEnc.first);
     writeUnit.setValue(8206 - startAddress, fillEnc.second);
     logMessage(QString("压力参数编码: 最小=原%1 -> 低位%2 高位%3, 最大=原%4 -> 低位%5 高位%6, 填充=原%7 -> 低位%8 高位%9")
-              .arg(minPressure)
-              .arg(minEnc.first)
-              .arg(minEnc.second)
-              .arg(maxPressure)
-              .arg(maxEnc.first)
-              .arg(maxEnc.second)
-              .arg(fillPressure)
-              .arg(fillEnc.first)
-              .arg(fillEnc.second), "info");
+              .arg(minPressure).arg(minEnc.first).arg(minEnc.second)
+              .arg(maxPressure).arg(maxEnc.first).arg(maxEnc.second)
+              .arg(fillPressure).arg(fillEnc.first).arg(fillEnc.second), "info");
 
-    // 4. 填充类型
-    writeUnit.setValue(8211 - startAddress, static_cast<quint16>(params.pressure.fillTypeIndex));          // 填充类型
+    writeUnit.setValue(8211 - startAddress, static_cast<quint16>(params.pressure.fillTypeIndex));
     logMessage(QString("填充类型代码: %1").arg(params.pressure.fillTypeIndex), "info");
 
-    // 5. 泄漏相关参数
-    writeUnit.setValue(8212 - startAddress, static_cast<quint16>(params.leak.leakUnitIndex));     // 泄漏单位
+    writeUnit.setValue(8212 - startAddress, static_cast<quint16>(params.leak.leakUnitIndex));
     writeUnit.setValue(8213 - startAddress, 256);
-    writeUnit.setValue(8214 - startAddress, static_cast<quint16>(params.leak.volumeUnitIndex));       // 容积单位
+    writeUnit.setValue(8214 - startAddress, static_cast<quint16>(params.leak.volumeUnitIndex));
     logMessage(QString("泄漏参数: 测试阈值=%1, 单位代码=%2")
               .arg(params.leak.testReject).arg(params.leak.leakUnitIndex), "info");
 
-    // 6. 容积和其他参数
-    // 将容积值映射为枚举编码（见VolumeEncoding.h）
     {
         int volumeInt = static_cast<int>(params.leak.volume);
-        quint16 volumeOrig = static_cast<quint16>(volumeInt);
         quint16 encoded8215 = VolumeEncoding::encode8215(volumeInt);
         quint16 encoded8216 = 0;
         if (VolumeEncoding::tryEncode(volumeInt, encoded8216)) {
-            volumeOrig = encoded8216;
         }
         writeUnit.setValue(8215 - startAddress, encoded8215);
         writeUnit.setValue(8216 - startAddress, encoded8216);
         logMessage(QString("容积参数: 原始容积=%1 8215=%2 8216=%3").arg(volumeInt).arg(encoded8215).arg(encoded8216));
     }
 
-    // 先用单位1编码还原单位，再取单位2编码
     LeakUnitType::Unit leakUnit = LeakUnitType::getUnitFromCode(static_cast<int>(params.leak.leakUnitIndex), LeakUnitType::CodeType1);
     quint16 leakUnitCode2 = static_cast<quint16>(LeakUnitType::getCode(leakUnit, LeakUnitType::CodeType2));
     
-    // 计算允许泄露值编码：根据泄露单位使用不同的编码方式
     quint16 allowLeakEncoded8219 = 0;
     quint16 allowLeakEncoded8220 = 0;
     double allowLeakValue = static_cast<double>(params.leak.testReject);
     
     if (leakUnit == LeakUnitType::Pa) {
-        // Pa单位：寄存器8219 = (2560 × 编码值) mod 65535
         quint32 allowLeakScaled = static_cast<quint32>(allowLeakValue * 2560);
         allowLeakEncoded8219 = static_cast<quint16>(allowLeakScaled % 65535);
         allowLeakEncoded8220 = 0;
         logMessage(QString("允许泄露值编码(Pa单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220), "info");
     } else if (leakUnit == LeakUnitType::MlPerMinute) {
-        // ml/min单位：
-        // 寄存器8220 = floor(输入值 / 64) × 256
-        // 寄存器8219 = ((输入值 × 256000) mod 65535) - 寄存器8220
         allowLeakEncoded8220 = static_cast<quint16>((static_cast<int>(allowLeakValue) / 64) * 256);
         quint32 scaled = static_cast<quint32>(allowLeakValue * 256000);
         allowLeakEncoded8219 = static_cast<quint16>((scaled % 65535) - allowLeakEncoded8220);
         logMessage(QString("允许泄露值编码(ml/min单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220), "info");
     } else {
-        // 其他单位：直接使用原值
         allowLeakEncoded8219 = static_cast<quint16>(allowLeakValue);
         allowLeakEncoded8220 = 0;
         logMessage(QString("允许泄露值编码(其他单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220), "info");
@@ -850,142 +810,202 @@ bool PlcMonitor::sendParamsToDevice(const AirTightnessFullParams& params)
     writeUnit.setValue(8217 - startAddress, leakUnitCode2); 
     writeUnit.setValue(8219 - startAddress, allowLeakEncoded8219); 
     writeUnit.setValue(8220 - startAddress, allowLeakEncoded8220); 
-    writeUnit.setValue(8218 - startAddress, 0); // 拒绝计算方式
+    writeUnit.setValue(8218 - startAddress, 0);
     writeUnit.setValue(8224 - startAddress, 64);
-    writeUnit.setValue(8225 - startAddress, 32068);          // 标准大气压
-    writeUnit.setValue(8227 - startAddress, 0);         // 标准温度
-    writeUnit.setValue(8229 - startAddress, static_cast<quint16>(params.leak.offset));          // 偏移量
+    writeUnit.setValue(8225 - startAddress, 32068);
+    writeUnit.setValue(8227 - startAddress, 0);
+    writeUnit.setValue(8229 - startAddress, static_cast<quint16>(params.leak.offset));
     logMessage(QString("容积: %1, 单位代码: %2, 标准大气压: %3, 标准温度: %4, 偏移量: %5")
               .arg(params.leak.volume).arg(params.leak.volumeUnitIndex).arg(params.leak.stdAtm).arg(params.leak.stdTemp).arg(params.leak.offset), "info");
 
-    // 发送批量写入请求
     logMessage(QString("准备批量发送从地址 %1 到 %2 的参数（共 %3 个寄存器）")
               .arg(startAddress).arg(endAddress).arg(numRegisters), "info");
     
     QModbusReply *reply = m_airtightModbusClient->sendWriteRequest(writeUnit, m_airtightDeviceAddress);
     if (!reply) {
         logMessage(QString("发送请求失败: %1").arg(m_airtightModbusClient->errorString()), "error");
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 等待回复或超时
-    QEventLoop loop;
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+    QPointer<QModbusReply> replyGuard(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeoutMs);
 
-    QTimer timer;
-    timer.setSingleShot(true);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(timeoutMs);
-
-    loop.exec();
-
-    // 处理回复或超时
-    bool success = false;
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-
-        if (reply->error() != QModbusDevice::NoError) {
-            logMessage(QString("发送命令失败: %1").arg(reply->errorString()), "error");
-        } else {
-            logMessage(QString("批量参数发送成功 - 从地址 %1 到 %2")
-                      .arg(startAddress).arg(endAddress), "success");
-            success = true;
+    connect(timeoutTimer, &QTimer::timeout, this, [this, startAddress, endAddress, callback, replyGuard, timeoutTimer]() {
+        if (replyGuard) {
+            logMessage(QString("发送命令超时 - 从地址 %1 到 %2").arg(startAddress).arg(endAddress), "error");
+            replyGuard->deleteLater();
         }
-        reply->deleteLater();
-    } else {
-        // 超时处理
-        logMessage(QString("发送命令超时 - 从地址 %1 到 %2")
-                  .arg(startAddress).arg(endAddress), "error");
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        reply->deleteLater();
-    }
-    
-    if (success) {
-        logMessage("所有参数已成功发送到设备", "success"); 
-    } else {
-        logMessage("发送参数完成命令失败", "warning");
-    }
-    return success;
+        if (callback) callback(false);
+        timeoutTimer->deleteLater();
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, startAddress, endAddress, callback, replyGuard, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        if (!replyGuard) {
+            if (callback) callback(false);
+            return;
+        }
+        bool success = false;
+        if (replyGuard->error() == QModbusDevice::NoError) {
+            logMessage(QString("批量参数发送成功 - 从地址 %1 到 %2").arg(startAddress).arg(endAddress), "success");
+            success = true;
+        } else {
+            logMessage(QString("发送命令失败: %1").arg(replyGuard->errorString()), "error");
+        }
+        replyGuard->deleteLater();
+        
+        if (success) {
+            logMessage("所有参数已成功发送到设备", "success");
+        } else {
+            logMessage("发送参数完成命令失败", "warning");
+        }
+        
+        if (callback) callback(success);
+    });
+
+    timeoutTimer->start();
 }
 
 void PlcMonitor::startAirtightInstrument()
 {
-    // 需要给plc寄存器516写入0，使用功能码05
-     // 使用统一的写入方法，确保正确处理回复与错误
-     if (!writePlcCoilBlocking(516, 0)) {
-         logMessage("向PLC寄存器516写入0失败", "error");
-     } else {
-         logMessage("向PLC寄存器516写入0成功", "success");
-     }
-    // 读取仪器评选，plc寄存器110，使用功能码03
-    int instrumentSelection = readInstrumentSelection();
+    writePlcCoil(516, 0, [this](bool writeOk) {
+        if (writeOk) {
+            logMessage("向PLC寄存器516写入0成功", "success");
+        } else {
+            logMessage("向PLC寄存器516写入0失败", "error");
+        }
 
-    // 第二步：根据仪器评选号从数据库读取参数并发送到气密仪
-    if (instrumentSelection > 0) {
-        try {
-            AirTightnessFullParams params = AirTightnessParamsDao::getParamsByProgramNumber(instrumentSelection);
-            
-            if (params.id != -1) {
-                logMessage(QString("成功根据仪器评选号 %1 读取到参数配置，参数组ID: %2")
-                          .arg(instrumentSelection).arg(params.id), "info");
-                sendPressureToRegulator(params);
+        readInstrumentSelection([this](int instrumentSelection) {
+            auto sendParamsAndStart = [this, instrumentSelection](const AirTightnessFullParams& params) {
+                sendPressureToRegulatorAsync(params, [this, instrumentSelection, params](bool) {
+                    sendParamsToDeviceAsyncWithRetry(params, 1, [this, instrumentSelection](bool paramsSent) {
+                        if (!paramsSent) {
+                            logMessage(QString("参数发送失败，已达到最大重试次数").arg(10), "error");
+                        }
+                        emit instrumentSelectionChanged(instrumentSelection);
+                        QTimer::singleShot(1000, this, [this]() {
+                            writeAirtightRegister(9472, 4608, [this](bool success) {
+                                if (success) {
+                                    logMessage("气密仪启动成功", "success");
+                                    if (m_airtightStartRetryTimer) m_airtightStartRetryTimer->stop();
+                                    m_airtightStartRetryActive = false;
+                                } else {
+                                    logMessage("气密仪启动失败，开始持续重试直到成功", "error");
+                                    if (m_airtightStartRetryTimer && !m_airtightStartRetryActive) {
+                                        m_airtightStartRetryActive = true;
+                                        m_airtightStartRetryTimer->start();
+                                    }
+                                }
+                            });
+                        });
+                    });
+                });
+            };
 
-                bool paramsSent = sendParamsToDevice(params);
-                if (!paramsSent) {
-                    logMessage("参数发送失败，开始重试（最多10次）", "warning");
-                    int attempt = 1;
-                    const int maxAttempts = 10;
-                    while (!paramsSent && attempt <= maxAttempts) {
-                        logMessage(QString("参数发送失败，正在重试，第 %1 次（共 %2 次）").arg(attempt).arg(maxAttempts), "warning");
-                        QThread::msleep(1500);
-                        paramsSent = sendParamsToDevice(params);
-                        ++attempt;
-                    }
-                    if (paramsSent) {
-                        logMessage("参数发送成功（重试后）", "success");
+            if (instrumentSelection > 0) {
+                try {
+                    AirTightnessFullParams params = AirTightnessParamsDao::getParamsByProgramNumber(instrumentSelection);
+                    if (params.id != -1) {
+                        logMessage(QString("成功根据仪器评选号 %1 读取到参数配置，参数组ID: %2")
+                                  .arg(instrumentSelection).arg(params.id), "info");
+                        sendParamsAndStart(params);
                     } else {
-                        logMessage(QString("参数发送失败，已达到最大重试次数 %1 次").arg(maxAttempts), "error");
+                        QString warningMsg = QString("警告：未找到程序号 %1 对应的参数配置，请先配置参数").arg(instrumentSelection);
+                        logMessage(warningMsg, "warning");
+                        QMessageBox::warning(this, "参数配置警告",
+                                            warningMsg + "\n\n请立即前往参数设置页面进行配置程序号：" + QString::number(instrumentSelection) + "的参数",
+                                            QMessageBox::Ok, QMessageBox::Ok);
+                        emit instrumentSelectionChanged(instrumentSelection);
                     }
+                } catch (const std::exception &e) {
+                    logMessage(QString("根据仪器评选号 %1 读取参数配置时发生异常: %2")
+                              .arg(instrumentSelection).arg(QString::fromUtf8(e.what())), "error");
+                    emit instrumentSelectionChanged(instrumentSelection);
                 }
+            } else if (instrumentSelection == 0) {
+                logMessage("仪器评选号为0，无法找到对应的参数配置", "warning");
+                emit instrumentSelectionChanged(instrumentSelection);
             } else {
-                QString warningMsg = QString("警告：未找到程序号 %1 对应的参数配置，请先配置参数")
-                                  .arg(instrumentSelection);
-                logMessage(warningMsg, "warning");
-                QMessageBox::warning(this, "参数配置警告",
-                                    warningMsg + "\n\n请立即前往参数设置页面进行配置程序号：" + QString::number(instrumentSelection) + "的参数",
-                                    QMessageBox::Ok, QMessageBox::Ok);
+                logMessage("警告：无法获取仪器评选数据，将使用默认配置启动气密仪", "warning");
+                emit instrumentSelectionChanged(instrumentSelection);
             }
-        } catch (const std::exception &e) {
-            logMessage(QString("根据仪器评选号 %1 读取参数配置时发生异常: %2")
-                      .arg(instrumentSelection).arg(QString::fromUtf8(e.what())), "error");
+        });
+    });
+}
+
+void PlcMonitor::sendParamsToDeviceAsyncWithRetry(const AirTightnessFullParams& params, int attempt, const std::function<void(bool)>& callback) {
+    const int maxAttempts = 10;
+    sendParamsToDevice(params, [this, params, attempt, maxAttempts, callback](bool success) {
+        if (success) {
+            if (callback) callback(true);
+        } else if (attempt < maxAttempts) {
+            logMessage(QString("参数发送失败，正在重试，第 %1 次（共 %2 次）").arg(attempt).arg(maxAttempts), "warning");
+            QTimer::singleShot(1500, this, [this, params, attempt, callback]() {
+                sendParamsToDeviceAsyncWithRetry(params, attempt + 1, callback);
+            });
+        } else {
+            if (callback) callback(false);
         }
-    } else if (instrumentSelection == 0) {
-        logMessage("仪器评选号为0，无法找到对应的参数配置", "warning");
-    } else {
-        logMessage("警告：无法获取仪器评选数据，将使用默认配置启动气密仪", "warning");
+    });
+}
+
+void PlcMonitor::sendPressureToRegulatorAsync(const AirTightnessFullParams& params, const std::function<void(bool)>& callback) {
+    if (!m_pressureModbusClient || !m_isPressureConnected) {
+        logMessage("调压装置未连接，跳过压力值发送（可选功能）", "info");
+        if (callback) callback(true);
+        return;
     }
 
-    // 第三步：发送仪器评选号信号给 realtimemonitor 和 airtighttestresult
-    logMessage(QString("发送仪器评选号信号: %1").arg(instrumentSelection));
-    emit instrumentSelectionChanged(instrumentSelection);
+    quint16 pressureValue = static_cast<quint16>((params.pressure.regulatorPressure + 3) / 0.18);
+    logMessage(QString("准备向调压装置发送压力值: %1").arg(pressureValue), "info");
 
-    // 然后向气密仪的寄存器地址9472发送值4608，启动气密仪
-    // 写入成功后，需要等待1秒，确保指令生效
-    QThread::msleep(1000);
-    bool success = writeAirtightRegister(9472, 4608);
-    if (success) {
-        logMessage("气密仪启动成功", "success");
-        // 启动成功则停止重试
-        if (m_airtightStartRetryTimer) m_airtightStartRetryTimer->stop();
-        m_airtightStartRetryActive = false;
-    } else {
-        logMessage("气密仪启动失败，开始持续重试直到成功", "error");
-        if (m_airtightStartRetryTimer && !m_airtightStartRetryActive) {
-            m_airtightStartRetryActive = true;
-            m_airtightStartRetryTimer->start();
-        }
+    QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, 80, 1);
+    writeUnit.setValue(0, pressureValue);
+
+    QModbusReply *reply = m_pressureModbusClient->sendWriteRequest(writeUnit, m_pressureDeviceAddress);
+    if (!reply) {
+        logMessage(QString("向调压装置发送压力值请求失败: %1").arg(m_pressureModbusClient->errorString()), "error");
+        if (callback) callback(false);
+        return;
     }
+
+    QPointer<QModbusReply> replyGuard(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(1000);
+
+    connect(timeoutTimer, &QTimer::timeout, this, [this, pressureValue, callback, replyGuard, timeoutTimer]() {
+        if (replyGuard) {
+            logMessage(QString("向调压装置发送压力值超时，值: %1").arg(pressureValue), "error");
+            replyGuard->deleteLater();
+        }
+        if (callback) callback(false);
+        timeoutTimer->deleteLater();
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, pressureValue, callback, replyGuard, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        if (!replyGuard) {
+            if (callback) callback(false);
+            return;
+        }
+        bool success = false;
+        if (replyGuard->error() == QModbusDevice::NoError) {
+            logMessage(QString("成功向调压装置发送压力值: %1").arg(pressureValue), "success");
+            success = true;
+        } else {
+            logMessage(QString("向调压装置发送压力值失败: %1, 值: %2").arg(replyGuard->errorString()).arg(pressureValue), "error");
+        }
+        replyGuard->deleteLater();
+        if (callback) callback(success);
+    });
+
+    timeoutTimer->start();
 }
 
 void PlcMonitor::handleTestResultReady(const TestResult &result)
@@ -1279,12 +1299,13 @@ bool PlcMonitor::writePlcCoilBlocking(quint16 address, int value){
 void PlcMonitor::resetAirtightInstrument()
 {
     // 向气密仪的寄存器地址9472发送值4864，复位气密仪
-    bool success = writeAirtightRegister(9472, 4864);
-    if (success) {
-        logMessage("气密仪复位成功", "success");
-    } else {
-        logMessage("气密仪复位失败", "error");
-    }
+    writeAirtightRegister(9472, 4864, [this](bool success) {
+        if (success) {
+            logMessage("气密仪复位成功", "success");
+        } else {
+            logMessage("气密仪复位失败", "error");
+        }
+    });
 }
 
 bool PlcMonitor::sendPressureToRegulator(const AirTightnessFullParams& params)
@@ -1370,13 +1391,14 @@ void PlcMonitor::attemptStartAirtight()
         return;
     }
 
-    bool success = writeAirtightRegister(9472, 4608);
-    if (success) {
-        logMessage("气密仪启动成功（重试）", "success");
-        if (m_airtightStartRetryTimer) m_airtightStartRetryTimer->stop();
-        m_airtightStartRetryActive = false;
-    } else {
-        logMessage("气密仪启动失败，继续重试", "warning");
-        // 保持定时器运行，下一次触发将再次尝试
-    }
+    writeAirtightRegister(9472, 4608, [this](bool success) {
+        if (success) {
+            logMessage("气密仪启动成功（重试）", "success");
+            if (m_airtightStartRetryTimer) m_airtightStartRetryTimer->stop();
+            m_airtightStartRetryActive = false;
+        } else {
+            logMessage("气密仪启动失败，继续重试", "warning");
+            // 保持定时器运行，下一次触发将再次尝试
+        }
+    });
 }

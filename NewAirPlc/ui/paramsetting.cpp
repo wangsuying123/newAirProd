@@ -166,39 +166,61 @@ void ParamSetting::updatePressureConnectionStatus(bool connected)
 
 void ParamSetting::on_sendToDeviceButton_clicked()
 {
-    // 收集参数并发送到设备
-    if (sendParamsToDevice()) {
-        // 需要把压力值发送调压装置
-        // 使用功能码06向调压装置写入压力值到寄存器80，从站地址1
-        if (pressureModbusClient) {
-            if (pressureModbusClient->state() == QModbusDevice::ConnectedState) {
-                QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, 80, 1);
-                writeUnit.setValue(0, g_lastSentFillPressure);
-                if (QModbusReply *reply = pressureModbusClient->sendWriteRequest(writeUnit, 1)) {
-                    QEventLoop loop;
-                    QTimer timer; timer.setSingleShot(true); timer.start(1000);
-                    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-                    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-                    loop.exec();
-                    // 成功与失败在界面用提示框提示，移除日志
-                    if (!(timer.isActive() && reply->error() == QModbusDevice::NoError)) {
-                        // 写入失败，无需日志
-                    }
-                    reply->deleteLater();
-                } else {
-                    // 发送请求失败，无需日志
-                }
-            } else {
-                // 未连接到调压装置，无需日志
-            }
+    ui->sendToDeviceButton->setEnabled(false);
+    
+    sendParamsToDevice([this](bool success) {
+        if (success) {
+            sendPressureToRegulatorAsync([this](bool) {
+                QMessageBox::information(this, "成功", "参数已成功发送到设备");
+                ui->sendToDeviceButton->setEnabled(true);
+            });
         } else {
-            // 调压装置客户端未初始化，无需日志
+            QMessageBox::critical(this, "失败", "参数发送失败，请检查连接和设备状态");
+            ui->sendToDeviceButton->setEnabled(true);
         }
-        
-        QMessageBox::information(this, "成功", "参数已成功发送到设备");
-    } else {
-        QMessageBox::critical(this, "失败", "参数发送失败，请检查连接和设备状态");
+    });
+}
+
+void ParamSetting::sendPressureToRegulatorAsync(const std::function<void(bool)>& callback)
+{
+    if (!pressureModbusClient) {
+        if (callback) callback(true);
+        return;
     }
+
+    if (pressureModbusClient->state() != QModbusDevice::ConnectedState) {
+        if (callback) callback(true);
+        return;
+    }
+
+    QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, 80, 1);
+    writeUnit.setValue(0, g_lastSentFillPressure);
+    
+    QModbusReply *reply = pressureModbusClient->sendWriteRequest(writeUnit, 1);
+    if (!reply) {
+        if (callback) callback(false);
+        return;
+    }
+
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(1000);
+
+    connect(timeoutTimer, &QTimer::timeout, this, [this, reply, callback, timeoutTimer]() {
+        reply->deleteLater();
+        timeoutTimer->deleteLater();
+        if (callback) callback(false);
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, reply, callback, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        bool success = (reply->error() == QModbusDevice::NoError);
+        reply->deleteLater();
+        if (callback) callback(success);
+    });
+
+    timeoutTimer->start();
 }
 
 void ParamSetting::on_saveParametersButton_clicked()
@@ -327,64 +349,53 @@ void ParamSetting::initUi()
     ui->sendToDeviceButton->setEnabled(false);
 }
 
-bool ParamSetting::sendModbusCommand(quint16 address, quint16 value, int timeoutMs, quint16 secondValue)
+void ParamSetting::sendModbusCommand(quint16 address, quint16 value, int timeoutMs, quint16 secondValue, const std::function<void(bool)>& callback)
 {
     if (!modbusClient) {
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
     if (modbusClient->state() != QModbusDevice::ConnectedState) {
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 强制使用功能码16（Write Multiple Registers）
-    // 即使只写入一个寄存器，也创建包含两个寄存器的数据单元以确保使用功能码16
-    int numValues = (secondValue != 0) ? 2 : 2; // 始终至少使用2个寄存器
+    int numValues = (secondValue != 0) ? 2 : 2;
     QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, address, numValues);
     writeUnit.setValue(0, value);
     if (secondValue != 0) {
         writeUnit.setValue(1, secondValue);
     } else {
-        // 对于单个寄存器写入，第二个寄存器设置为0（不影响设备）
         writeUnit.setValue(1, 0);
     }
 
-    // 发送写入请求 - 使用功能码16
     QModbusReply *reply = modbusClient->sendWriteRequest(writeUnit, static_cast<quint8>(slaveId));
     if (!reply) {
         Logger::log(Logger::Error, QString("发送请求失败: %1").arg(modbusClient->errorString()));
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 等待回复或超时
-    QEventLoop loop;
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeoutMs);
 
-    QTimer timer;
-    timer.setSingleShot(true);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(timeoutMs);
-
-    loop.exec();
-
-    // 处理回复或超时
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-
-        if (reply->error() != QModbusDevice::NoError) {
-            reply->deleteLater();
-            return false;
-        }
-
+    connect(timeoutTimer, &QTimer::timeout, this, [this, reply, callback, timeoutTimer]() {
         reply->deleteLater();
-        return true;
-    } else {
-        // 超时处理
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+        timeoutTimer->deleteLater();
+        if (callback) callback(false);
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, reply, callback, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        bool success = (reply->error() == QModbusDevice::NoError);
         reply->deleteLater();
-        return false;
-    }
+        if (callback) callback(success);
+    });
+
+    timeoutTimer->start();
 }
 AirTightnessFullParams ParamSetting::collectParamsFromUI()
 {
@@ -586,242 +597,189 @@ void ParamSetting::updateParamsList()
     }
 }
 
-bool ParamSetting::sendParamsToDevice()
+void ParamSetting::sendParamsToDevice(const std::function<void(bool)>& callback)
 {
     if (!modbusClient || modbusClient->state() != QModbusDevice::ConnectedState) {
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 开始收集参数准备发送到设备（移除日志）
+    const int timeoutMs = 1000;
+    const quint16 startAddress = 8192;
+    const quint16 endAddress = 8229;
+    const int numRegisters = endAddress - startAddress + 1;
     
-    const int timeoutMs = 1000; // 单个命令超时时间
-    const quint16 startAddress = 8192; // 起始地址
-    const quint16 endAddress = 8229;   // 结束地址
-    const int numRegisters = endAddress - startAddress + 1; // 寄存器数量
+    int programNumber = ui->programNumberComboBox->currentText().toInt();
     
-    // 先发送地址8192,值为1的命令，通知设备准备接收参数
-    sendModbusCommand(8192, 26112, timeoutMs);
-    
-    // 等待设备准备
-    QThread::msleep(500);
-    
-    // 创建批量写入数据单元，从8192到8229共38个寄存器
     QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, startAddress, numRegisters);
     
-    // 初始化所有寄存器值为0
     for (int i = 0; i < numRegisters; ++i) {
         writeUnit.setValue(i, 0);
     }
     
-    // 重新设置8192地址的值为26112，确保不会被覆盖为0
     writeUnit.setValue(8192 - startAddress, 26112);
     
-    // 发送程序号（使用未使用的地址8193）
-    int programNumber = ui->programNumberComboBox->currentText().toInt();
-    // writeUnit.setValue(8193 - startAddress, programNumber);
     Logger::log(Logger::Info, QString("开始发送参数到设备，程序号=%1").arg(programNumber));
 
-    // 1. 时间参数：保持编码逻辑不变，但保留无符号编码值
-    auto encodeTime = [](double n) -> quint16 {  // 返回无符号类型
+    auto encodeTime = [](double n) -> quint16 {
         if (n < 0.0) n = 0.0;
         if (n > 200.0) n = 200.0;
         quint16 value = static_cast<quint16>(std::round(n * 100.0));
         quint16 low = static_cast<quint16>(value & 0xFFu);
         quint16 high = static_cast<quint16>((value >> 8) & 0xFFu);
-        return static_cast<quint16>((low << 8) | high);  // 返回无符号编码值
+        return static_cast<quint16>((low << 8) | high);
     };
 
-    // 2. 编码得到无符号值（直接用于写入寄存器）
     quint16 fillTime = encodeTime(ui->fillTimeSpinBox->value());
     quint16 stabilizationTime = encodeTime(ui->stabilizationTimeSpinBox->value());
     quint16 testTime = encodeTime(ui->testTimeSpinBox->value());
     quint16 dumpTime = encodeTime(ui->dumpTimeSpinBox->value());
 
-    // 3. 以无符号类型写入寄存器（关键修改：确保setValue接受quint16）
-    // 若writeUnit.setValue支持无符号参数，直接传入：
-    writeUnit.setValue(8196 - startAddress, fillTime);        // 填充时间（无符号）
-    writeUnit.setValue(8197 - startAddress, stabilizationTime); // 稳定时间（无符号）
-    writeUnit.setValue(8198 - startAddress, testTime);         // 测试时间（无符号）
-    writeUnit.setValue(8199 - startAddress, dumpTime);         // 排放时间（无符号）
+    writeUnit.setValue(8196 - startAddress, fillTime);
+    writeUnit.setValue(8197 - startAddress, stabilizationTime);
+    writeUnit.setValue(8198 - startAddress, testTime);
+    writeUnit.setValue(8199 - startAddress, dumpTime);
     Logger::log(Logger::Debug, QString("时间参数编码: 填充=%1 稳定=%2 测试=%3 排放=%4").arg(fillTime).arg(stabilizationTime).arg(testTime).arg(dumpTime));
 
-    // 4. 压力单位
     PressureUnit::Unit pressureUnit = ui->pressureUnitComboBox->currentData().value<PressureUnit::Unit>();
     quint16 pressureUnitCode = static_cast<quint16>(PressureUnit::toCode(pressureUnit));
-    writeUnit.setValue(8200 - startAddress, pressureUnitCode);   // 压力单位
-    // 压力单位代码日志移除
+    writeUnit.setValue(8200 - startAddress, pressureUnitCode);
 
-    // 3. 压力值参数
     quint16 minPressure = static_cast<quint16>(ui->minPressureSpinBox->value());
     quint16 maxPressure = static_cast<quint16>(ui->maxPressureSpinBox->value());
     quint16 setFill = static_cast<quint16>(ui->setFillSpinBox->value());
-    // 将调压阀压力值直接取整数部分并做范围保护后保存到全局变量中（用于调压装置）
+    
     {
         double __val = ui->regulatorPressureSpinBox->value();
-        int __intPressure = static_cast<int>((__val + 3) / 0.18); // 直接取整（截断小数）
+        int __intPressure = static_cast<int>((__val + 3) / 0.18);
         if (__intPressure < 0) __intPressure = 0;
         if (__intPressure > 65535) __intPressure = 65535;
         g_lastSentFillPressure = static_cast<quint16>(__intPressure);
     }
-    // 压力编码：按示例，将数值×1000得到32位，拆分为高/低16位，并分别进行字节交换
+
     auto swap16 = [](quint16 v) -> quint16 { return static_cast<quint16>((v << 8) | (v >> 8)); };
     auto encodePressure = [&](quint16 n) -> QPair<quint16, quint16> {
-        quint32 raw = static_cast<quint32>(n) * 1000u; // 例如 n=70 -> 70000 (0x00011170)
-        quint16 low = static_cast<quint16>(raw & 0xFFFFu);       // 低16位，如0x1170
-        quint16 high = static_cast<quint16>((raw >> 16) & 0xFFFFu); // 高16位，如0x0001
-        return qMakePair(swap16(low), swap16(high)); // 字节交换：0x1170->0x7011, 0x0001->0x0100
+        quint32 raw = static_cast<quint32>(n) * 1000u;
+        quint16 low = static_cast<quint16>(raw & 0xFFFFu);
+        quint16 high = static_cast<quint16>((raw >> 16) & 0xFFFFu);
+        return qMakePair(swap16(low), swap16(high));
     };
     QPair<quint16, quint16> minEnc = encodePressure(minPressure);
     QPair<quint16, quint16> maxEnc = encodePressure(maxPressure);
     QPair<quint16, quint16> fillEnc = encodePressure(setFill);
-    // 最小压力: 写入8201(低位交换) / 8202(高位交换)
+
     writeUnit.setValue(8201 - startAddress, minEnc.first);
     writeUnit.setValue(8202 - startAddress, minEnc.second);
-    // 最大压力: 写入8203 / 8204
     writeUnit.setValue(8203 - startAddress, maxEnc.first);
     writeUnit.setValue(8204 - startAddress, maxEnc.second);
-    // 填充压力: 写入8205 / 8206
     writeUnit.setValue(8205 - startAddress, fillEnc.first);
     writeUnit.setValue(8206 - startAddress, fillEnc.second);
     Logger::log(Logger::Info, QString("压力参数编码: 最小(low=%1,high=%2) 最大(low=%3,high=%4) 填充(low=%5,high=%6)")
                 .arg(minEnc.first).arg(minEnc.second)
                 .arg(maxEnc.first).arg(maxEnc.second)
                 .arg(fillEnc.first).arg(fillEnc.second));
-    // 已将填充压力（取整后）保存到全局变量（移除日志）
 
-    // 4. 填充类型
     FillType::Type fillType = ui->fillTypeComboBox->currentData().value<FillType::Type>();
     quint16 fillTypeCode = static_cast<quint16>(FillType::toCode(fillType));
-    writeUnit.setValue(8211 - startAddress, fillTypeCode);          // 填充类型
+    writeUnit.setValue(8211 - startAddress, fillTypeCode);
     Logger::log(Logger::Info, QString("填充类型代码=%1").arg(fillTypeCode));
 
-    // 5. 泄漏相关参数
     LeakUnitType::Unit leakUnit = ui->leakUnitComboBox->currentData().value<LeakUnitType::Unit>();
     quint16 leakUnitCode = static_cast<quint16>(LeakUnitType::getCode(leakUnit, LeakUnitType::CodeType1));
     quint16 leakUnitCode2 = static_cast<quint16>(LeakUnitType::getCode(leakUnit, LeakUnitType::CodeType2));
-    quint16 testReject = static_cast<quint16>(ui->testRejectSpinBox->value());
-    quint16 refReject = static_cast<quint16>(ui->refRejectSpinBox->value());
     
-    // 允许泄露值编码：根据泄露单位使用不同的编码方式
     quint16 allowLeakEncoded8219 = 0;
     quint16 allowLeakEncoded8220 = 0;
     double allowLeakValue = ui->testRejectSpinBox->value();
     
     if (leakUnit == LeakUnitType::Pa) {
-        // Pa单位：寄存器8219 = (2560 × 编码值) mod 65535
         quint32 allowLeakScaled = static_cast<quint32>(allowLeakValue * 2560);
         allowLeakEncoded8219 = static_cast<quint16>(allowLeakScaled % 65535);
         allowLeakEncoded8220 = 0;
         Logger::log(Logger::Info, QString("允许泄露值编码(Pa单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220));
     } else if (leakUnit == LeakUnitType::MlPerMinute) {
-        // ml/min单位：
-        // 寄存器8220 = floor(输入值 / 64) × 256
-        // 寄存器8219 = ((输入值 × 256000) mod 65535) - 寄存器8220
         allowLeakEncoded8220 = static_cast<quint16>((static_cast<int>(allowLeakValue) / 64) * 256);
         quint32 scaled = static_cast<quint32>(allowLeakValue * 256000);
         allowLeakEncoded8219 = static_cast<quint16>((scaled % 65535) - allowLeakEncoded8220);
         Logger::log(Logger::Info, QString("允许泄露值编码(ml/min单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220));
     } else {
-        // 其他单位：直接使用原值
         allowLeakEncoded8219 = static_cast<quint16>(allowLeakValue);
         allowLeakEncoded8220 = 0;
         Logger::log(Logger::Info, QString("允许泄露值编码(其他单位): 原值=%1, 8219=%2, 8220=%3").arg(allowLeakValue).arg(allowLeakEncoded8219).arg(allowLeakEncoded8220));
     }
     
-    writeUnit.setValue(8212 - startAddress, leakUnitCode);     // 泄漏单位
-    writeUnit.setValue(8213 - startAddress, 256);      // 测试拒绝阈值
-    writeUnit.setValue(8217 - startAddress, leakUnitCode2);       // 8217 泄漏单位2
-    writeUnit.setValue(8219 - startAddress, allowLeakEncoded8219);       // 允许泄露值（编码后）
-    writeUnit.setValue(8220 - startAddress, allowLeakEncoded8220);       // 允许泄露值高位（ml/min时使用）
+    writeUnit.setValue(8212 - startAddress, leakUnitCode);
+    writeUnit.setValue(8213 - startAddress, 256);
+    writeUnit.setValue(8217 - startAddress, leakUnitCode2);
+    writeUnit.setValue(8219 - startAddress, allowLeakEncoded8219);
+    writeUnit.setValue(8220 - startAddress, allowLeakEncoded8220);
     
     VolumeUnit volumeUnit = ui->volumeUnitComboBox->currentData().value<VolumeUnit>();
     quint16 volumeUnitCode = static_cast<quint16>(volumeUnitToCode(volumeUnit));
     int volumeInt = ui->volumeSpinBox->value();
-    quint16 volume = static_cast<quint16>(volumeInt);
-    // 需要把容积值映射到枚举编码
-    {
-        quint16 encoded = 0;
-        if (VolumeEncoding::tryEncode(static_cast<int>(volume), encoded)) {
-            volume = encoded;
-        }
+    
+    quint16 encoded8215 = VolumeEncoding::encode8215(volumeInt);
+    quint16 encoded8216 = 0;
+    if (VolumeEncoding::tryEncode(volumeInt, encoded8216)) {
     }
-    quint16 rejectCalc = static_cast<quint16>(ui->rejectCalcComboBox->currentIndex());
-    quint16 stdAtm = static_cast<quint16>(ui->stdAtmSpinBox->value());
-    quint16 stdTemp = static_cast<quint16>(ui->stdTempSpinBox->value());
-    quint16 offset = static_cast<quint16>(ui->offsetSpinBox->value());
-    writeUnit.setValue(8214 - startAddress, volumeUnitCode);        // 容积单位
-    // 容积参数：使用新的分段函数编码
-    {
-        quint16 encoded8215 = VolumeEncoding::encode8215(volumeInt);
-        quint16 encoded8216 = 0;
-        if (VolumeEncoding::tryEncode(volumeInt, encoded8216)) {
-            volume = encoded8216;
-        }
-        writeUnit.setValue(8215 - startAddress, encoded8215);       
-        writeUnit.setValue(8216 - startAddress, encoded8216);          // 容积
-        Logger::log(Logger::Info, QString("容积参数: 单位代码=%1 原始容积=%2 8215=%3 8216=%4").arg(volumeUnitCode).arg(volumeInt).arg(encoded8215).arg(encoded8216));
-    }
-    Logger::log(Logger::Info, QString("泄漏参数: 泄漏单位代码=%1, 测试拒绝=%2, 参考拒绝=%3")
-                .arg(leakUnitCode).arg(testReject).arg(refReject));
-    Logger::log(Logger::Info, QString("计算方式=%1 标准大气压=%2 标准温度=%3 偏移量=%4")
-                .arg(rejectCalc).arg(stdAtm).arg(stdTemp).arg(offset));
-    writeUnit.setValue(8218 - startAddress, rejectCalc); // 拒绝计算方式
-    writeUnit.setValue(8224 - startAddress, 64);
-    writeUnit.setValue(8225 - startAddress, 32068);          // 标准大气压
-    writeUnit.setValue(8227 - startAddress, 0);         // 标准温度
-    writeUnit.setValue(8229 - startAddress, offset);          // 偏移量
-    // 容积及标准值日志移除
+    writeUnit.setValue(8214 - startAddress, volumeUnitCode);
+    writeUnit.setValue(8215 - startAddress, encoded8215);
+    writeUnit.setValue(8216 - startAddress, encoded8216);
+    Logger::log(Logger::Info, QString("容积参数: 单位代码=%1 原始容积=%2 8215=%3 8216=%4").arg(volumeUnitCode).arg(volumeInt).arg(encoded8215).arg(encoded8216));
 
-    // 发送批量写入请求
+    quint16 rejectCalc = static_cast<quint16>(ui->rejectCalcComboBox->currentIndex());
+    quint16 offset = static_cast<quint16>(ui->offsetSpinBox->value());
+    
+    writeUnit.setValue(8218 - startAddress, rejectCalc);
+    writeUnit.setValue(8224 - startAddress, 64);
+    writeUnit.setValue(8225 - startAddress, 32068);
+    writeUnit.setValue(8227 - startAddress, 0);
+    writeUnit.setValue(8229 - startAddress, offset);
+
     Logger::log(Logger::Info, QString("准备批量发送从地址 %1 到 %2 的参数（共 %3 个寄存器）")
                 .arg(startAddress).arg(endAddress).arg(numRegisters));
     
     QModbusReply *reply = modbusClient->sendWriteRequest(writeUnit, static_cast<quint8>(slaveId));
     if (!reply) {
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 等待回复或超时
-    QEventLoop loop;
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(timeoutMs);
 
-    QTimer timer;
-    timer.setSingleShot(true);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(timeoutMs);
+    connect(timeoutTimer, &QTimer::timeout, this, [this, startAddress, endAddress, callback, reply, timeoutTimer]() {
+        Logger::log(Logger::Error, QString("发送命令超时 - 从地址 %1 到 %2").arg(startAddress).arg(endAddress));
+        reply->deleteLater();
+        timeoutTimer->deleteLater();
+        if (callback) callback(false);
+    });
 
-    loop.exec();
-
-    // 处理回复或超时
-    bool success = false;
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-
-        if (reply->error() != QModbusDevice::NoError) {
-            Logger::log(Logger::Error, QString("发送命令失败: %1").arg(reply->errorString()));
-        } else {
+    connect(reply, &QModbusReply::finished, this, [this, startAddress, endAddress, programNumber, callback, reply, timeoutTimer]() {
+        timeoutTimer->stop();
+        timeoutTimer->deleteLater();
+        
+        bool success = false;
+        if (reply->error() == QModbusDevice::NoError) {
             Logger::log(Logger::Info, QString("批量参数发送成功 - 从地址 %1 到 %2").arg(startAddress).arg(endAddress));
             success = true;
+        } else {
+            Logger::log(Logger::Error, QString("发送命令失败: %1").arg(reply->errorString()));
         }
         reply->deleteLater();
-    } else {
-        // 超时处理
-        Logger::log(Logger::Error, QString("发送命令超时 - 从地址 %1 到 %2").arg(startAddress).arg(endAddress));
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        reply->deleteLater();
-    }
-    
-    if (success) {
-        Logger::log(Logger::Info, "所有参数已成功发送到设备");
-        // 发送程序号信号
-        int programNumber = ui->programNumberComboBox->currentText().toInt();
-        emit programNumberSent(programNumber);
-    } else {
-        Logger::log(Logger::Warning, "发送参数完成命令失败");
-    }
-    
-    return success;
+        
+        if (success) {
+            Logger::log(Logger::Info, "所有参数已成功发送到设备");
+            emit programNumberSent(programNumber);
+        } else {
+            Logger::log(Logger::Warning, "发送参数完成命令失败");
+        }
+        
+        if (callback) callback(success);
+    });
+
+    timeoutTimer->start();
 }
 
 // 获取容积单位显示文本
@@ -838,40 +796,33 @@ QString ParamSetting::getVolumeUnitString(VolumeUnit unit)
     }
 }
 
-bool ParamSetting::sendModbusBatchCommand(const QList<QPair<quint16, quint16>>& paramList, int timeout)
+void ParamSetting::sendModbusBatchCommand(const QList<QPair<quint16, quint16>>& paramList, int timeout, const std::function<void(bool)>& callback)
 {
     if (!modbusClient || paramList.isEmpty()) {
-        return false;
+        if (callback) callback(false);
+        return;
     }
 
-    // 开始发送批量Modbus命令（移除日志）
+    if (paramList.isEmpty()) {
+        if (callback) callback(true);
+        return;
+    }
 
-    // 记录开始时间，用于统计总耗时
-    QElapsedTimer timer;
-    timer.start();
-    
-    // 发送所有参数（使用sendModbusCommand单个发送，已强制使用功能码16）
-    int successCount = 0;
-    
-    for (int i = 0; i < paramList.size(); i++) {
-        const auto& param = paramList[i];
-        quint16 address = param.first;
-        quint16 value = param.second;
-        
-        // 单个命令发送（移除日志）
-        
-        if (sendModbusCommand(address, value, timeout)) {
-            successCount++;
-            // 单个命令发送成功（移除日志）
-        } else {
-            // 单个命令发送失败（移除日志）
+    std::function<void(int, int)> sendNext;
+    sendNext = [this, paramList, timeout, callback, &sendNext](int index, int successCount) {
+        if (index >= paramList.size()) {
+            if (callback) callback(successCount == paramList.size());
+            return;
         }
-        
-        QThread::msleep(50); // 命令间短暂延迟
-    }
 
-    // 批量命令发送完成统计（移除日志）
-    // 平均每个命令耗时统计（移除日志）
+        const auto& param = paramList[index];
+        sendModbusCommand(param.first, param.second, timeout, 0, [this, paramList, timeout, callback, index, successCount, &sendNext](bool success) {
+            int newSuccessCount = success ? successCount + 1 : successCount;
+            QTimer::singleShot(50, this, [this, paramList, timeout, callback, index, newSuccessCount, &sendNext]() {
+                sendNext(index + 1, newSuccessCount);
+            });
+        });
+    };
 
-    return successCount == paramList.size();
+    sendNext(0, 0);
 }

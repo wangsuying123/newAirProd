@@ -96,6 +96,8 @@ private:
 
     // 新增：updateSummaryResult 防抖/去重标志，避免短时间内重复执行
     bool m_summaryUpdateInProgress = false;
+    // 新增：防抖定时器（替代静态变量）
+    QTimer *m_debounceTimer = nullptr;
 
     void initUI();
     // 枚举定义测试进程状态

@@ -85,11 +85,22 @@ DebugPage::DebugPage(QWidget *parent)
 
 DebugPage::~DebugPage()
 {
+    // 先停止所有定时器，防止定时器回调访问已删除的UI组件
+    if (m_flashTimer) { m_flashTimer->stop(); }
+    if (timeTimer) { timeTimer->stop(); }
+    if (m_plcSyncTimer) { m_plcSyncTimer->stop(); }
+    
+    // 断开所有信号连接
+    disconnect();
+    
+    // 删除UI组件
     delete ui;
-    // 定时器清理
-    if (timeTimer) { timeTimer->stop(); delete timeTimer; }
-    if (m_flashTimer) { m_flashTimer->stop(); delete m_flashTimer; }
-    if (m_plcSyncTimer) { m_plcSyncTimer->stop(); delete m_plcSyncTimer; }
+    
+    // 清理定时器
+    if (timeTimer) { delete timeTimer; }
+    if (m_flashTimer) { delete m_flashTimer; }
+    if (m_plcSyncTimer) { delete m_plcSyncTimer; }
+    
     // 断开Modbus连接
     if (m_plcModbusClient && m_plcModbusClient->state() != QModbusDevice::UnconnectedState) {
         m_plcModbusClient->disconnectDevice();
@@ -276,8 +287,11 @@ void DebugPage::initUI()
     ui->alBtn->setStyleSheet(defaultStyle);
     ui->runBtn->setStyleSheet(defaultStyle);
 
-    // 初始化读取PLC线圈状态并设置开关按钮颜色（1:开绿关红，0:开红关绿）
-    syncPlcButtonStates();
+    // 初始化所有开关按钮为关闭状态（红色）
+    initializeSwitchButtons();
+    
+    // PLC连接后再同步按钮状态，避免初始化时访问未连接的PLC
+    // syncPlcButtonStates(); // 移到连接成功后调用
 }
 
 void DebugPage::onConnectionStatusChanged(bool isPlc, bool connected)
@@ -1171,6 +1185,71 @@ bool DebugPage::sendParamsToDevice(const AirTightnessFullParams& params)
     }
     
     return success;
+}
+
+void DebugPage::initializeSwitchButtons()
+{
+    // 初始化所有开关按钮为关闭状态（关按钮显示绿色，开按钮显示红色）
+    
+    // 增压进
+    setButtonStyle(ui->trayInBtn, false);
+    setButtonStyle(ui->trayInOffBtn, true);
+    
+    // 返程进缸
+    setButtonStyle(ui->trayOutBtn, false);
+    setButtonStyle(ui->trayOutOffBtn, true);
+    
+    // 主缸进
+    setButtonStyle(ui->mainCylinderInBtn, false);
+    setButtonStyle(ui->mainCylinderInOffBtn, true);
+    
+    // 主缸退
+    setButtonStyle(ui->mainCylinderOutBtn, false);
+    setButtonStyle(ui->mainCylinderOutOffBtn, true);
+    
+    // 封堵1
+    setButtonStyle(ui->block1Btn, false);
+    setButtonStyle(ui->block1OffBtn, true);
+    
+    // 封堵2
+    setButtonStyle(ui->block2Btn, false);
+    setButtonStyle(ui->block2OffBtn, true);
+    
+    // 封堵3
+    setButtonStyle(ui->block3Btn, false);
+    setButtonStyle(ui->block3OffBtn, true);
+    
+    // 充气阀1
+    setButtonStyle(ui->inflateValve1Btn, false);
+    setButtonStyle(ui->inflateValve1OffBtn, true);
+    
+    // 排气阀1
+    setButtonStyle(ui->exhaustValve1Btn, false);
+    setButtonStyle(ui->exhaustValve1OffBtn, true);
+    
+    // 充气阀2
+    setButtonStyle(ui->inflateValve2Btn, false);
+    setButtonStyle(ui->inflateValve2OffBtn, true);
+    
+    // 排气阀2
+    setButtonStyle(ui->exhaustValve2Btn, false);
+    setButtonStyle(ui->exhaustValve2OffBtn, true);
+    
+    // 充气阀3
+    setButtonStyle(ui->inflateValve3Btn, false);
+    setButtonStyle(ui->inflateValve3OffBtn, true);
+    
+    // 排气阀3
+    setButtonStyle(ui->exhaustValve3Btn, false);
+    setButtonStyle(ui->exhaustValve3OffBtn, true);
+    
+    // 手动操作
+    setButtonStyle(ui->manualBtn, false);
+    setButtonStyle(ui->manualOffBtn, true);
+    
+    // 总封堵
+    setButtonStyle(ui->totalSealOnBtn, false);
+    setButtonStyle(ui->totalSealOffBtn, true);
 }
 
 void DebugPage::setButtonStyle(QPushButton *button, bool active)

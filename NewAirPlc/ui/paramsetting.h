@@ -2,9 +2,10 @@
 #define PARAMSETTING_H
 
 #include <QWidget>
-#include <QModbusDevice>  // 包含QModbusDevice头文件
-#include <QThread>        // 用于线程检查
+#include <QModbusDevice>
+#include <QThread>
 #include <QPointer>
+#include <functional>
 #include "AirTightnessParams.h"
 #include "VolumeUnit.h"
 
@@ -52,14 +53,15 @@ private:
     QTimer *connectionDelayTimer;
 
     void initUi();
-    bool sendModbusCommand(quint16 address, quint16 value, int timeoutMs = 1000, quint16 secondValue = 0); // 添加第二个寄存器值参数，默认0
+    void sendModbusCommand(quint16 address, quint16 value, int timeoutMs, quint16 secondValue, const std::function<void(bool)>& callback);
     
     AirTightnessFullParams collectParamsFromUI();
     void loadParamsToUI(const AirTightnessFullParams& params);
     void updateParamsList();
-    bool sendParamsToDevice();
-    bool sendModbusBatchCommand(const QList<QPair<quint16, quint16>>& paramList, int timeout);
+    void sendParamsToDevice(const std::function<void(bool)>& callback);
+    void sendModbusBatchCommand(const QList<QPair<quint16, quint16>>& paramList, int timeout, const std::function<void(bool)>& callback);
     QString getVolumeUnitString(VolumeUnit unit);
+    void sendPressureToRegulatorAsync(const std::function<void(bool)>& callback);
 };
 
 #endif // PARAMSETTING_H

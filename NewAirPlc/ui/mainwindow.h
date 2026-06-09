@@ -24,6 +24,7 @@ class PlcMonitor;
 class DebugPage;
 class AirtightTestResult;
 class UserManagement;
+class QModbusClient;
 
 class MainWindow : public QMainWindow
 {
@@ -61,6 +62,7 @@ private:
     User m_currentUser; // 当前登录用户
 
     TcpServerController *m_tcpServerController;
+    bool m_connectionClientForwardingReady;
 
     // 菜单和动作成员变量（保留用于权限控制）
     QMenu *menuCommunication;
@@ -83,6 +85,10 @@ private:
     void createSidebar();           // 创建纵向侧边栏
     void setSidebarButtonActive(QPushButton *btn); // 设置当前激活按钮
     void ensureInterPageConnections();
+    void setupConnectionClientForwarding();
+    void syncConnectionClients();
+    void applyModbusClientUpdate(bool isPlc, QModbusClient *client);
+    void applyPressureClientUpdate(QModbusClient *client);
     void updateMenuPermissions();
 
     // 侧边栏按钮

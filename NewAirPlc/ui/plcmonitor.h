@@ -163,16 +163,22 @@ private:
     void readCoilsAsync(quint16 startAddress, quint16 count,
                         const std::function<void(bool success, const QVector<quint16>& values)>& callback);
     
-    // 向气密仪写入数据
-    bool writeAirtightRegister(quint16 address, quint16 value);
+    // 向气密仪写入数据（异步版本）
+    void writeAirtightRegister(quint16 address, quint16 value, const std::function<void(bool)>& callback);
     
-    // 读取仪器评选数据
-    int readInstrumentSelection();
+    // 读取仪器评选数据（异步版本）
+    void readInstrumentSelection(const std::function<void(int)>& callback);
     
-    // 将参数发送到设备
-    bool sendParamsToDevice(const AirTightnessFullParams& params);
+    // 将参数发送到设备（异步版本）
+    void sendParamsToDevice(const AirTightnessFullParams& params, const std::function<void(bool)>& callback);
     
-    // 将压力值发送到调压装置
+    // 将压力值发送到调压装置（异步版本）
+    void sendPressureToRegulatorAsync(const AirTightnessFullParams& params, const std::function<void(bool)>& callback);
+    
+    // 带重试的异步参数发送
+    void sendParamsToDeviceAsyncWithRetry(const AirTightnessFullParams& params, int attempt, const std::function<void(bool)>& callback);
+    
+    // 同步阻塞版本（保留用于向后兼容）
     bool sendPressureToRegulator(const AirTightnessFullParams& params);
     
     // 启动气密仪

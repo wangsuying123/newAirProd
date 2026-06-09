@@ -129,8 +129,6 @@ void AirtightTestResult::updateConnectionStatus(bool isPlc, bool connected)
     if (!isPlc) {
         isConnected = connected;
         if (connected) {
-            logMessage("设备已连接，等待RealtimeMonitor发送测试结果数据");
-            
             // 设备断开连接，停止监控定时器
             if (monitorTimer && monitorTimer->isActive()) {
                 monitorTimer->stop();
@@ -567,7 +565,7 @@ void AirtightTestResult::writePlcRegister(quint16 address, quint16 value, QModbu
     doWrite();
 }
 
-void AirtightTestResult::handleWriteFailure(quint16 address, quint16 value, 
+void AirtightTestResult::handleWriteFailure(quint16 address, quint16, 
                                            std::shared_ptr<int> retryCount, std::shared_ptr<bool> completed,
                                            const std::function<void(bool)>& callback, std::function<void()> doWrite,
                                            const QString& errorStr, const QVector<int>& backoffDelays, int maxRetries) {
@@ -908,7 +906,7 @@ void AirtightTestResult::onTestResultRegisterDataReady(const QModbusDataUnit &da
         QMutexLocker locker(&m_stateMutex);
         m_testResultState = TestResultState::Idle;
     }
-    m_isProcessing.store(false);
+    m_isProcessing = false;
 }
 
 void AirtightTestResult::logMessage(const QString &message, bool isError)

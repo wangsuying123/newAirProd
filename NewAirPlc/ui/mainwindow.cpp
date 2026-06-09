@@ -58,6 +58,7 @@ MainWindow::MainWindow(QWidget *parent)
     , airtightTestResultPage(nullptr)
     , userManagementPage(nullptr)
     , m_tcpServerController(new TcpServerController(this))
+    , m_connectionClientForwardingReady(false)
 {
     ui->setupUi(this);
     setWindowTitle(tr("智芯气密仪上位机"));
@@ -458,6 +459,8 @@ void MainWindow::initUI()
     // 重新建立PlcMonitor到AirtightTestResult的信号连接，确保连接不会丢失
     qDebug() << "========= 确保页面间信号连=========";
     ensureInterPageConnections();
+    setupConnectionClientForwarding();
+    syncConnectionClients();
     // 设置默认显示实时监控页面
     if (stackedWidget && realtimeMonitorPage) {
         stackedWidget->setCurrentWidget(realtimeMonitorPage);
@@ -733,6 +736,9 @@ void MainWindow::openAirtightTestResultWindow()
 
 void MainWindow::ensureInterPageConnections()
 {
+    static bool connectionsEstablished = false;
+    if (connectionsEstablished) return;
+    
     // PlcMonitor -> AirtightTestResult
     if (plcMonitorPage && airtightTestResultPage) {
         QObject::connect(plcMonitorPage, &PlcMonitor::instrumentSelectionChanged,
@@ -826,120 +832,8 @@ void MainWindow::ensureInterPageConnections()
     } else {
         qDebug() << "警告: 无法建立RealtimeMonitor到TcpServerController的信号连接，页面或控制器可能未正确初始化";
     }
-    // ConnectWidget -> RealtimeMonitor/PlcMonitor/DebugPage: 同步客户端与连接状态，确保页面联动
-    if (connectPage) {
-        if (realtimeMonitorPage) {
-            // 先断开旧的连接，避免重
-            QObject::disconnect(connectPage, &ConnectWidget::modbusClientUpdated, realtimeMonitorPage, nullptr);
-            QObject::connect(connectPage, &ConnectWidget::modbusClientUpdated, this,
-                             [this](bool isPlc, QModbusClient* client){
-                                 if (!realtimeMonitorPage) return;
-                                 if (isPlc) {
-                                     // PLC客户端更
-                                     realtimeMonitorPage->setPlcModbusClient(client);
-                                     bool connected = client && client->state() == QModbusDevice::ConnectedState;
-                                     realtimeMonitorPage->updateConnectionStatus(true, connected);
-                                     qDebug() << "ConnectWidget通知RealtimeMonitor: PLC连接状" << connected;
-                                 } else {
-                                     // 气密仪客户端更新
-                                     realtimeMonitorPage->setModbusClient(client);
-                                     realtimeMonitorPage->setAirtightSlaveId(connectPage->getAirtightSlaveId());
-                                     bool connected = client && client->state() == QModbusDevice::ConnectedState;
-                                     realtimeMonitorPage->updateConnectionStatus(false, connected);
-                                     qDebug() << "ConnectWidget通知RealtimeMonitor: 气密仪连接状" << connected;
-                                 }
-                             });
-            // 监听调压装置连接状态变
-            QObject::disconnect(connectPage, &ConnectWidget::pressureConnectionChanged, realtimeMonitorPage, nullptr);
-            QObject::connect(connectPage, &ConnectWidget::pressureConnectionChanged,
-                             realtimeMonitorPage, &RealtimeMonitor::updatePressureConnectionStatus,
-                             Qt::UniqueConnection);
-            // 初始同步一次当前客户端状
-            QModbusClient* curAir = connectPage->getModbusClient(false);
-            realtimeMonitorPage->setModbusClient(curAir);
-            realtimeMonitorPage->setAirtightSlaveId(connectPage->getAirtightSlaveId());
-            bool airConnected = curAir && curAir->state() == QModbusDevice::ConnectedState;
-            realtimeMonitorPage->updateConnectionStatus(false, airConnected);
-            QModbusClient* curPlc = connectPage->getModbusClient(true);
-            realtimeMonitorPage->setPlcModbusClient(curPlc);
-            bool plcConnected = curPlc && curPlc->state() == QModbusDevice::ConnectedState;
-            realtimeMonitorPage->updateConnectionStatus(true, plcConnected);
-            QModbusClient* curPressure = connectPage->getPressureModbusClient();
-            bool pressureConnected = curPressure && curPressure->state() == QModbusDevice::ConnectedState;
-            realtimeMonitorPage->updatePressureConnectionStatus(pressureConnected);
-            qDebug() << "初始同步RealtimeMonitor连接状 气密" << airConnected << " PLC=" << plcConnected << " 调压=" << pressureConnected;
-        }
-        if (plcMonitorPage) {
-            // 先断开旧的连接，避免重
-            QObject::disconnect(connectPage, &ConnectWidget::modbusClientUpdated, plcMonitorPage, nullptr);
-            // 使用默认连接类型，不使用 UniqueConnection（lambda 不支持唯一连接
-            QObject::connect(connectPage, &ConnectWidget::modbusClientUpdated, plcMonitorPage,
-                             [this](bool isPlc, QModbusClient* client){
-                                 if (!plcMonitorPage) return;
-                                 if (isPlc) {
-                                     plcMonitorPage->setModbusClient(client);
-                                 } else {
-                                     plcMonitorPage->setAirtightModbusClient(client);
-                                 }
-                             });
-            // 初始同步一次当前客户端
-            QModbusClient* curPlc = connectPage->getModbusClient(true);
-            QModbusClient* curAir = connectPage->getModbusClient(false);
-            plcMonitorPage->setModbusClient(curPlc);
-            plcMonitorPage->setAirtightModbusClient(curAir);
-            // 同步从站地址（Unit ID
-            plcMonitorPage->setDeviceAddress(connectPage->getPlcSlaveId());
-            plcMonitorPage->setAirtightDeviceAddress(connectPage->getAirtightSlaveId());
-        }
-        if (debugPage) {
-            // 先断开旧的连接，避免重
-            QObject::disconnect(connectPage, &ConnectWidget::modbusClientUpdated, debugPage, nullptr);
-            // 使用默认连接类型，不使用 UniqueConnection（lambda 不支持唯一连接
-            QObject::connect(connectPage, &ConnectWidget::modbusClientUpdated, debugPage,
-                             [this](bool isPlc, QModbusClient* client){
-                                 if (!debugPage) return;
-                                 if (isPlc) {
-                                     debugPage->setPlcModbusClient(client);
-                                 } else {
-                                     debugPage->setAirtightModbusClient(client);
-                                 }
-                             });
-            // 初始同步一次当前客户端
-            QModbusClient* curPlc = connectPage->getModbusClient(true);
-            QModbusClient* curAir = connectPage->getModbusClient(false);
-            debugPage->setPlcModbusClient(curPlc);
-            debugPage->setAirtightModbusClient(curAir);
-            // 同步从站地址（Unit ID
-            debugPage->setPlcDeviceAddress(connectPage->getPlcSlaveId());
-            debugPage->setAirtightDeviceAddress(connectPage->getAirtightSlaveId());
-        }
-        // 同步ConnectWidget到AirtightTestResult：客户端与连接状
-        if (airtightTestResultPage) {
-            // 先断开旧的连接，避免重
-            QObject::disconnect(connectPage, &ConnectWidget::modbusClientUpdated, airtightTestResultPage, nullptr);
-            QObject::connect(connectPage, &ConnectWidget::modbusClientUpdated, this,
-                             [this](bool isPlc, QModbusClient* client){
-                                 if (!airtightTestResultPage) return;
-                                 bool connected = client && client->state() == QModbusDevice::ConnectedState;
-                                 if (isPlc) {
-                                     airtightTestResultPage->setPlcModbusClient(client);
-                                     airtightTestResultPage->updateConnectionStatus(true, connected);
-                                 } else {
-                                     airtightTestResultPage->setModbusClient(client);
-                                     airtightTestResultPage->updateConnectionStatus(false, connected);
-                                 }
-                             });
-            // 初始同步一次当前客户端
-            QModbusClient* curAir = connectPage->getModbusClient(false);
-            QModbusClient* curPlc = connectPage->getModbusClient(true);
-            airtightTestResultPage->setModbusClient(curAir);
-            airtightTestResultPage->setPlcModbusClient(curPlc);
-            bool airConnected = curAir && curAir->state() == QModbusDevice::ConnectedState;
-            airtightTestResultPage->updateConnectionStatus(false, airConnected);
-            bool plcConnected = curPlc && curPlc->state() == QModbusDevice::ConnectedState;
-            airtightTestResultPage->updateConnectionStatus(true, plcConnected);
-        }
-    }
+    
+    connectionsEstablished = true;  // 标记连接已建立
 }
 
 void MainWindow::openConnectWindow()

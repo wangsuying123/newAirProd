@@ -407,7 +407,8 @@ void Logger::ensureLogDirectory()
     // 注意：此函数在持有锁的情况下被调用，不要使用 qDebug/qWarning 避免递归死锁
     QDir logDir(m_logPath);
     if (!logDir.exists()) {
-        logDir.mkpath(".");
+        // 使用完整路径创建目录，确保日志目录能正确创建
+        logDir.mkpath(m_logPath);
     }
 }
 

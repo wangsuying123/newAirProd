@@ -101,6 +101,26 @@ private:
     // 自动连接相关变量
     bool autoConnectEnabled;
     int autoConnectRetryCount;
+    
+    // 自动重连相关变量
+    QTimer *plcReconnectTimer;
+    int plcReconnectAttempts;
+    bool plcReconnectEnabled;
+    const int maxReconnectAttempts = 5; // 最大重连次数
+    const int reconnectInterval = 3000; // 重连间隔（毫秒）
+    
+    // 连接状态处理标志（防止并发问题）
+    bool isProcessingPlcDisconnect; // 是否正在处理PLC断开
+    
+    // 气密仪自动重连相关变量
+    QTimer *airReconnectTimer;
+    int airReconnectAttempts;
+    bool airReconnectEnabled;
+    
+    // 调压装置自动重连相关变量
+    QTimer *pressureReconnectTimer;
+    int pressureReconnectAttempts;
+    bool pressureReconnectEnabled;
 
     // 自动检测并更新串口列表
     void updateSerialPorts();
@@ -133,7 +153,21 @@ private:
     void autoConnectPLC();
     void autoConnectAirTightness();
     void autoConnectPressure();
-
+    
+    // PLC自动重连与心跳检测相关函数
+    void startPlcReconnect();
+    void stopPlcReconnect();
+    void attemptPlcReconnect();
+    
+    // 气密仪自动重连相关函数
+    void startAirReconnect();
+    void stopAirReconnect();
+    void attemptAirReconnect();
+    
+    // 调压装置自动重连相关函数
+    void startPressureReconnect();
+    void stopPressureReconnect();
+    void attemptPressureReconnect();
 
 };
 

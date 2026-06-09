@@ -75,7 +75,17 @@ ConnectWidget::ConnectWidget(QWidget *parent) :
     airtightSlaveId(1), // 默认气密仪从站地址为1
     pressureSlaveId(1), // 默认调压装置从站地址为1
     autoConnectEnabled(true),
-    autoConnectRetryCount(0)
+    autoConnectRetryCount(0),
+    plcReconnectTimer(nullptr),
+    plcReconnectAttempts(0),
+    plcReconnectEnabled(false),
+    isProcessingPlcDisconnect(false),
+    airReconnectTimer(nullptr),
+    airReconnectAttempts(0),
+    airReconnectEnabled(false),
+    pressureReconnectTimer(nullptr),
+    pressureReconnectAttempts(0),
+    pressureReconnectEnabled(false)
 {
     // 首先初始化UI组件
     ui->setupUi(this);
@@ -127,6 +137,21 @@ ConnectWidget::ConnectWidget(QWidget *parent) :
     autoConnectTimer->setSingleShot(true);
     connect(autoConnectTimer, &QTimer::timeout, this, &ConnectWidget::performAutoConnect);
     autoConnectTimer->start(1000); // 1秒后执行自动连接
+    
+    // 初始化PLC自动重连定时器
+    plcReconnectTimer = new QTimer(this);
+    plcReconnectTimer->setSingleShot(true);
+    connect(plcReconnectTimer, &QTimer::timeout, this, &ConnectWidget::attemptPlcReconnect);
+    
+    // 初始化气密仪自动重连定时器
+    airReconnectTimer = new QTimer(this);
+    airReconnectTimer->setSingleShot(true);
+    connect(airReconnectTimer, &QTimer::timeout, this, &ConnectWidget::attemptAirReconnect);
+    
+    // 初始化调压装置自动重连定时器
+    pressureReconnectTimer = new QTimer(this);
+    pressureReconnectTimer->setSingleShot(true);
+    connect(pressureReconnectTimer, &QTimer::timeout, this, &ConnectWidget::attemptPressureReconnect);
 
 }
 
@@ -137,25 +162,49 @@ ConnectWidget::~ConnectWidget()
     if (plcModbusClient) {
         plcModbusClient->disconnectDevice();
         delete plcModbusClient;
+        plcModbusClient = nullptr;
     }
     if (airModbusClient) {
         airModbusClient->disconnectDevice();
         delete airModbusClient;
+        airModbusClient = nullptr;
     }
     if (pressureModbusClient) {
         pressureModbusClient->disconnectDevice();
         delete pressureModbusClient;
+        pressureModbusClient = nullptr;
     }
 
-    // 释放定时器
+    // 释放定时器（先停止再删除，确保线程安全）
     if (plcTestTimer) {
+        plcTestTimer->stop();
         delete plcTestTimer;
+        plcTestTimer = nullptr;
     }
     if (airTestTimer) {
+        airTestTimer->stop();
         delete airTestTimer;
+        airTestTimer = nullptr;
     }
     if (autoConnectTimer) {
+        autoConnectTimer->stop();
         delete autoConnectTimer;
+        autoConnectTimer = nullptr;
+    }
+    if (plcReconnectTimer) {
+        plcReconnectTimer->stop();
+        delete plcReconnectTimer;
+        plcReconnectTimer = nullptr;
+    }
+    if (airReconnectTimer) {
+        airReconnectTimer->stop();
+        delete airReconnectTimer;
+        airReconnectTimer = nullptr;
+    }
+    if (pressureReconnectTimer) {
+        pressureReconnectTimer->stop();
+        delete pressureReconnectTimer;
+        pressureReconnectTimer = nullptr;
     }
 
     delete ui;
@@ -565,6 +614,11 @@ void ConnectWidget::onPlcStateChanged(QModbusDevice::State state)
         // 更新连接状态和时间戳
         ConnectionParamsDao::updateConnectionStatus("PLC", true, "连接成功");
         
+        // 启用自动重连功能（连接成功后自动开启）
+        plcReconnectEnabled = true;
+        // 停止可能正在进行的重连尝试
+        stopPlcReconnect();
+        
         // 保存连接历史
         ConnectionParamsDao::saveConnectionHistory("PLC", "success", "");
         
@@ -575,6 +629,13 @@ void ConnectWidget::onPlcStateChanged(QModbusDevice::State state)
         // connect-all 逻辑已移除
     } else if (state == QModbusDevice::UnconnectedState) {
         if (plcConnected) {
+            // 防止并发问题：如果正在处理断开，则跳过
+            if (isProcessingPlcDisconnect) {
+                addLog("PLC断开处理中，忽略重复的断开事件");
+                return;
+            }
+            isProcessingPlcDisconnect = true;
+            
             // 如果之前是连接状态，现在断开了，记录日志
             plcConnected = false;
             addLog("PLC连接意外断开");
@@ -584,6 +645,11 @@ void ConnectWidget::onPlcStateChanged(QModbusDevice::State state)
             
             // 更新连接状态
             ConnectionParamsDao::updateConnectionStatus("PLC", false, "连接断开");
+            
+            // 启动自动重连机制
+            startPlcReconnect();
+            
+            isProcessingPlcDisconnect = false;
         } else if (!plcConnected && plcModbusClient) {
             // 连接尝试失败
             ui->plcConnectBtn->setEnabled(true);
@@ -729,6 +795,10 @@ void ConnectWidget::onAirStateChanged(QModbusDevice::State state)
         
         // 发送Modbus客户端对象更新信号
         emit modbusClientUpdated(false, airModbusClient);
+        
+        // 启用自动重连功能
+        airReconnectEnabled = true;
+        stopAirReconnect();
     } else if (state == QModbusDevice::UnconnectedState) {
         if (airConnected) {
             // 如果之前是连接状态，现在断开了，记录日志
@@ -740,6 +810,9 @@ void ConnectWidget::onAirStateChanged(QModbusDevice::State state)
             
             // 更新连接状态
             ConnectionParamsDao::updateConnectionStatus("AirTightness", false, "连接断开");
+            
+            // 启动自动重连机制
+            startAirReconnect();
         } else if (!airConnected && airModbusClient) {
             // 连接尝试失败
             ui->airConnectBtn->setEnabled(true);
@@ -939,6 +1012,10 @@ void ConnectWidget::on_plcDisconnectBtn_clicked()
 
     // 清除自动连接标志（手动断开不应该自动重连）
     ConnectionParamsDao::setAutoConnect("PLC", false);
+    
+    // 停止自动重连机制
+    plcReconnectEnabled = false;
+    stopPlcReconnect();
 
     // 更新状态与UI
     updateConnectionStatus(true, false);
@@ -969,6 +1046,10 @@ void ConnectWidget::on_airDisconnectBtn_clicked()
 
     // 清除自动连接标志（手动断开不应该自动重连）
     ConnectionParamsDao::setAutoConnect("AirTightness", false);
+    
+    // 停止自动重连机制
+    airReconnectEnabled = false;
+    stopAirReconnect();
 
     // 更新状态与UI
     updateConnectionStatus(false, false);
@@ -1176,6 +1257,12 @@ void ConnectWidget::onPressureStateChanged(QModbusDevice::State state)
 // 调压装置连接成功
 void ConnectWidget::onPressureConnected()
 {
+    // 空指针检查
+    if (!pressureModbusClient) {
+        addLog("警告: 调压装置连接成功但客户端为空");
+        return;
+    }
+    
     int protocolIndex = ui->protocolComboBox->currentIndex();
     if (protocolIndex == 0) { // TCP
         addLog(QString("调压装置Modbus连接成功: %1:%2")
@@ -1204,6 +1291,10 @@ void ConnectWidget::onPressureConnected()
     
     // 更新调压装置状态
     updatePressureDeviceStatus(true);
+    
+    // 启用自动重连功能
+    pressureReconnectEnabled = true;
+    stopPressureReconnect();
 }
 
 // 调压装置断开连接
@@ -1218,6 +1309,9 @@ void ConnectWidget::onPressureDisconnected()
     
     // 更新调压装置状态
     updatePressureDeviceStatus(false);
+    
+    // 启动自动重连机制
+    startPressureReconnect();
 }
 
 // 调压装置错误处理
@@ -1295,6 +1389,10 @@ void ConnectWidget::on_disconnectButton_clicked()
     if (pressureConnected) {
         // 清除自动连接标志（手动断开不应该自动重连）
         ConnectionParamsDao::setAutoConnect("Pressure", false);
+        
+        // 停止自动重连机制
+        pressureReconnectEnabled = false;
+        stopPressureReconnect();
         
         disconnectFromPressureDevice();
     }
@@ -1398,3 +1496,192 @@ void ConnectWidget::autoConnectPressure()
     // 触发调压装置连接按钮的点击事件
     on_connectButton_clicked();
 }
+
+// 启动PLC自动重连机制
+void ConnectWidget::startPlcReconnect()
+{
+    // 如果手动断开连接，则不启动自动重连
+    if (!plcReconnectEnabled) {
+        addLog("PLC自动重连已禁用");
+        return;
+    }
+    
+    // 重置重连尝试次数
+    plcReconnectAttempts = 0;
+    
+    // 如果已经在重连中，先停止
+    if (plcReconnectTimer->isActive()) {
+        plcReconnectTimer->stop();
+    }
+    
+    // 启动第一次重连尝试
+    plcReconnectTimer->start(reconnectInterval);
+    addLog(QString("PLC连接断开，将在%1秒后尝试自动重连").arg(reconnectInterval / 1000));
+}
+
+// 尝试PLC重连
+void ConnectWidget::attemptPlcReconnect()
+{
+    if (plcConnected) {
+        // 已经连接成功，不需要重连
+        addLog("PLC已重新连接，停止重连尝试");
+        return;
+    }
+    
+    plcReconnectAttempts++;
+    
+    if (plcReconnectAttempts > maxReconnectAttempts) {
+        addLog(QString("PLC自动重连失败，已尝试%1次，停止重连").arg(maxReconnectAttempts));
+        return;
+    }
+    
+    addLog(QString("PLC自动重连尝试 %1/%2...").arg(plcReconnectAttempts).arg(maxReconnectAttempts));
+    
+    // 尝试重新连接
+    if (plcModbusClient) {
+        bool success = plcModbusClient->connectDevice();
+        if (!success) {
+            addLog(QString("PLC重连尝试 %1 失败: %2").arg(plcReconnectAttempts).arg(plcModbusClient->errorString()));
+            // 安排下一次重连
+            plcReconnectTimer->start(reconnectInterval);
+        }
+    } else {
+        addLog("PLC重连失败: Modbus客户端未初始化");
+        plcReconnectTimer->start(reconnectInterval);
+    }
+}
+
+// 停止PLC自动重连
+void ConnectWidget::stopPlcReconnect()
+{
+    if (plcReconnectTimer && plcReconnectTimer->isActive()) {
+        plcReconnectTimer->stop();
+        addLog("PLC自动重连已停止");
+    }
+}
+
+// ========== 气密仪自动重连 ==========
+
+// 启动气密仪自动重连机制
+void ConnectWidget::startAirReconnect()
+{
+    if (!airReconnectEnabled) {
+        addLog("气密仪自动重连已禁用");
+        return;
+    }
+    
+    airReconnectAttempts = 0;
+    
+    if (airReconnectTimer->isActive()) {
+        airReconnectTimer->stop();
+    }
+    
+    airReconnectTimer->start(reconnectInterval);
+    addLog(QString("气密仪连接断开，将在%1秒后尝试自动重连").arg(reconnectInterval / 1000));
+}
+
+// 尝试气密仪重连
+void ConnectWidget::attemptAirReconnect()
+{
+    if (airConnected) {
+        addLog("气密仪已重新连接，停止重连尝试");
+        return;
+    }
+    
+    airReconnectAttempts++;
+    
+    if (airReconnectAttempts > maxReconnectAttempts) {
+        addLog(QString("气密仪自动重连失败，已尝试%1次，停止重连").arg(maxReconnectAttempts));
+        return;
+    }
+    
+    addLog(QString("气密仪自动重连尝试 %1/%2...").arg(airReconnectAttempts).arg(maxReconnectAttempts));
+    
+    if (airModbusClient) {
+        bool success = airModbusClient->connectDevice();
+        if (!success) {
+            addLog(QString("气密仪重连尝试 %1 失败: %2").arg(airReconnectAttempts).arg(airModbusClient->errorString()));
+            // 使用指数退避延迟重连，避免频繁重试
+            int delay = reconnectInterval * qMin(airReconnectAttempts, 5);
+            addLog(QString("气密仪将在%1秒后进行第%2次重连").arg(delay / 1000).arg(airReconnectAttempts + 1));
+            airReconnectTimer->start(delay);
+        }
+    } else {
+        addLog("气密仪重连失败: Modbus客户端未初始化");
+        airReconnectTimer->start(reconnectInterval);
+    }
+}
+
+// 停止气密仪自动重连
+void ConnectWidget::stopAirReconnect()
+{
+    if (airReconnectTimer && airReconnectTimer->isActive()) {
+        airReconnectTimer->stop();
+        addLog("气密仪自动重连已停止");
+    }
+}
+
+
+
+// ========== 调压装置自动重连与心跳检测 ==========
+
+// 启动调压装置自动重连机制
+void ConnectWidget::startPressureReconnect()
+{
+    if (!pressureReconnectEnabled) {
+        addLog("调压装置自动重连已禁用");
+        return;
+    }
+    
+    pressureReconnectAttempts = 0;
+    
+    if (pressureReconnectTimer->isActive()) {
+        pressureReconnectTimer->stop();
+    }
+    
+    pressureReconnectTimer->start(reconnectInterval);
+    addLog(QString("调压装置连接断开，将在%1秒后尝试自动重连").arg(reconnectInterval / 1000));
+}
+
+// 尝试调压装置重连
+void ConnectWidget::attemptPressureReconnect()
+{
+    if (pressureConnected) {
+        addLog("调压装置已重新连接，停止重连尝试");
+        return;
+    }
+    
+    pressureReconnectAttempts++;
+    
+    if (pressureReconnectAttempts > maxReconnectAttempts) {
+        addLog(QString("调压装置自动重连失败，已尝试%1次，停止重连").arg(maxReconnectAttempts));
+        return;
+    }
+    
+    addLog(QString("调压装置自动重连尝试 %1/%2...").arg(pressureReconnectAttempts).arg(maxReconnectAttempts));
+    
+    if (pressureModbusClient) {
+        bool success = pressureModbusClient->connectDevice();
+        if (!success) {
+            addLog(QString("调压装置重连尝试 %1 失败: %2").arg(pressureReconnectAttempts).arg(pressureModbusClient->errorString()));
+            // 使用指数退避延迟重连，避免频繁重试
+            int delay = reconnectInterval * qMin(pressureReconnectAttempts, 5);
+            addLog(QString("调压装置将在%1秒后进行第%2次重连").arg(delay / 1000).arg(pressureReconnectAttempts + 1));
+            pressureReconnectTimer->start(delay);
+        }
+    } else {
+        addLog("调压装置重连失败: Modbus客户端未初始化");
+        pressureReconnectTimer->start(reconnectInterval);
+    }
+}
+
+// 停止调压装置自动重连
+void ConnectWidget::stopPressureReconnect()
+{
+    if (pressureReconnectTimer && pressureReconnectTimer->isActive()) {
+        pressureReconnectTimer->stop();
+        addLog("调压装置自动重连已停止");
+    }
+}
+
+

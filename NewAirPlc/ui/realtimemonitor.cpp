@@ -56,21 +56,31 @@ RealtimeMonitor::~RealtimeMonitor() {
     // 停止定时器并清理资源
     stopPLCRegister519Check();
     stopPLCRegister200Check();
+    
     if (plcPollTimer) {
+        plcPollTimer->stop();
         delete plcPollTimer;
         plcPollTimer = nullptr;
     }
     if (dataRefreshTimer) {
+        dataRefreshTimer->stop();
         delete dataRefreshTimer;
         dataRefreshTimer = nullptr;
     }
     if (reg9088Timer) {
+        reg9088Timer->stop();
         delete reg9088Timer;
         reg9088Timer = nullptr;
     }
     if (progressTimer) {
+        progressTimer->stop();
         delete progressTimer;
         progressTimer = nullptr;
+    }
+    if (m_debounceTimer) {
+        m_debounceTimer->stop();
+        delete m_debounceTimer;
+        m_debounceTimer = nullptr;
     }
     // MonitorDataDao使用静态方法，不需要释放
     delete ui;
@@ -149,7 +159,6 @@ void RealtimeMonitor::updateConnectionStatus(bool isPlc, bool connected)
                 "padding: 4px 12px;\n"
                 "border-radius: 12px;"
                 );
-            logMessage("PLC连接成功");
             // 合并后：统一启动PLC轮询
             startPLCRegister519Check();
             startPLCRegister200Check();
@@ -162,7 +171,6 @@ void RealtimeMonitor::updateConnectionStatus(bool isPlc, bool connected)
                 "padding: 4px 12px;\n"
                 "border-radius: 12px;"
                 );
-            logMessage("PLC连接断开");
             // 合并后：统一停止PLC轮询
             stopPLCRegister519Check();
             stopPLCRegister200Check();
@@ -179,7 +187,6 @@ void RealtimeMonitor::updateConnectionStatus(bool isPlc, bool connected)
                 "padding: 4px 12px;\n"
                 "border-radius: 12px;"
                 );
-            logMessage("气密仪Modbus客户端未初始化", true);
             return;
         }
 
@@ -252,7 +259,6 @@ void RealtimeMonitor::updateConnectionStatus(bool isPlc, bool connected)
                 reg9088Timer->stop();
                 logMessage("停止实时监测");
             }
-            logMessage("气密仪连接已断开");
         }
     }
 }
@@ -272,7 +278,6 @@ void RealtimeMonitor::updatePressureConnectionStatus(bool connected)
             "font-size: 13px;\n"
             "border: 2px solid #86efac;"
             );
-        logMessage("调压装置连接成功");
     } else {
         ui->pressureConnectionStatusLabel->setText("🔴 调压装置: 未连接");
         ui->pressureConnectionStatusLabel->setStyleSheet(
@@ -284,7 +289,6 @@ void RealtimeMonitor::updatePressureConnectionStatus(bool connected)
             "font-size: 13px;\n"
             "border: 2px solid #fecaca;"
             );
-        logMessage("调压装置连接断开");
     }
 }
 
@@ -324,6 +328,11 @@ void RealtimeMonitor::initUI()
     
     // 启动阶段计时器，确保elapsed()返回有效值
     phaseElapsedTimer.start();
+    
+    // 初始化防抖定时器（用于updateSummaryResult）
+    m_debounceTimer = new QTimer(this);
+    m_debounceTimer->setSingleShot(true);
+    m_debounceTimer->setInterval(30);
 
     // 设置默认刷新间隔为500ms（避免请求堆积）
     ui->refreshRateSpinBox->setValue(500); // 默认500毫秒
@@ -987,7 +996,7 @@ void RealtimeMonitor::processMainRegisterData(const QModbusDataUnit &data)
         QString pressureUnitStr = "KPa"; // 默认压力单位
         QString leakUnitStr = "cc/min"; // 默认泄漏单位
 
-        // 只有当读取成功时，才转换寄存器值并更新UI
+        // 当读取成功时，转换寄存器值
             if (allReadSuccess) {
                 // 将寄存器值转换为实际数值
                 // 1. 压力值参数解码：低位(8708)和高位(8709)分别字节交换，根据高位是否为0选择缩放因子
@@ -1031,15 +1040,15 @@ void RealtimeMonitor::processMainRegisterData(const QModbusDataUnit &data)
                 // 根据泄漏单位选择缩放因子：Pa单位使用10，其他单位使用1000
                 double leakScale = (leakUnitEnum == LeakUnitType::Pa) ? 10.0 : 1000.0;
                 leak = static_cast<double>(static_cast<int32_t>(r1Swapped) - static_cast<int32_t>(r2Swapped)) / leakScale;
-
-                // 更新UI显示
-                ui->pressureValueLabel->setText(QString::number(pressure, 'f', 2));
-                ui->leakValueLabel->setText(QString::number(leak, 'f', 3));
-                
-                // 更新UI显示单位
-                ui->pressureUnitLabel->setText(pressureUnitStr);
-                ui->leakUnitLabel->setText(leakUnitStr);
             }
+
+            // 无论读取是否完全成功，都更新UI显示（使用有效值或上次有效值）
+            ui->pressureValueLabel->setText(QString::number(pressure, 'f', 2));
+            ui->leakValueLabel->setText(QString::number(leak, 'f', 3));
+            
+            // 更新UI显示单位
+            ui->pressureUnitLabel->setText(pressureUnitStr);
+            ui->leakUnitLabel->setText(leakUnitStr);
 
         // 更新连接状态显示 - 只在状态变化时更新UI，避免频繁刷新导致的闪烁
         bool newConnectionState = (modbusClient && modbusClient->state() == QModbusDevice::ConnectedState && allReadSuccess);
@@ -1073,11 +1082,6 @@ void RealtimeMonitor::processMainRegisterData(const QModbusDataUnit &data)
             if (!temperatureUnitRead) failedParams.append("温度单位 (寄存器8717)");
 
             logMessage(QString("以下参数读取失败，保持上次读取的值: %1").arg(failedParams.join(", ")), true);
-            
-            // 只有在processValue读取成功时才更新测试进程状态
-            if (!processValueRead) {
-                return; // 如果测试进程状态也读取失败，则直接返回，不更新任何UI
-            }
         }
 
         // 输出寄存器8707的原始值到日志
@@ -1258,8 +1262,9 @@ bool RealtimeMonitor::writeZeroToPLCRegisters() {
         {49411, 3}   // 49411,49412,49413
     };
     
-    bool plcWriteSuccess = true;
-    int pendingBatches = batches.size();
+    // 使用智能指针避免异步回调中引用已销毁的局部变量
+    auto plcWriteSuccess = std::make_shared<bool>(true);
+    auto pendingBatches = std::make_shared<int>(batches.size());
     
     for (const auto& batch : batches) {
         QModbusDataUnit writeUnit(QModbusDataUnit::Coils, batch.startAddr, batch.count);
@@ -1271,19 +1276,19 @@ bool RealtimeMonitor::writeZeroToPLCRegisters() {
         QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, plcSlaveId);
         if (reply) {
             // 异步完成回调，避免阻塞主线程
-            connect(reply, &QModbusReply::finished, reply, [this, reply, batch, &plcWriteSuccess, &pendingBatches]() {
+            connect(reply, &QModbusReply::finished, reply, [this, reply, batch, plcWriteSuccess, pendingBatches]() {
                 if (reply->error() != QModbusDevice::NoError) {
                     logMessage(QString("批量写入PLC寄存器失败: 地址%1开始%2个线圈, 错误=%3")
                               .arg(batch.startAddr).arg(batch.count).arg(reply->errorString()), true);
-                    plcWriteSuccess = false;
+                    *plcWriteSuccess = false;
                 }
-                pendingBatches--;
+                (*pendingBatches)--;
                 reply->deleteLater();
             });
         } else {
             logMessage(QString("发送批量写请求失败: 地址%1开始%2个线圈").arg(batch.startAddr).arg(batch.count), true);
-            plcWriteSuccess = false;
-            pendingBatches--;
+            *plcWriteSuccess = false;
+            (*pendingBatches)--;
         }
     }
     
@@ -1291,11 +1296,11 @@ bool RealtimeMonitor::writeZeroToPLCRegisters() {
     // 真正的写入结果由回调记录日志，不再阻塞等待。
     // 这样避免了当 PLC 通信繁忙时调用方被卡住导致的崩溃风险。
     
-    if (!plcWriteSuccess) {
+    if (!(*plcWriteSuccess)) {
         QMessageBox::warning(this, "警告", "部分PLC寄存器写入失败，请检查连接");
     }
     
-    return plcWriteSuccess;
+    return *plcWriteSuccess;
 }
 
 // 检查PLC寄存器519的值的方法
@@ -2073,16 +2078,13 @@ void RealtimeMonitor::handleTestResultReady3(const TestResult &result)
 void RealtimeMonitor::updateSummaryResult() {
     // ====== 防抖核心 ======
     // 每次调用都重置定时器：30ms内无新调用才真正执行
-    static QTimer *debounceTimer = nullptr;
-    if (!debounceTimer) {
-        debounceTimer = new QTimer();
-        debounceTimer->setSingleShot(true);
-        debounceTimer->setInterval(30);
+    if (!m_debounceTimer) {
+        return;
     }
     // 断开旧连接（如果有）
-    debounceTimer->disconnect();
+    m_debounceTimer->disconnect();
     // 连接新的执行动作（用 QObject::connect 的函数指针方式）
-    QObject::connect(debounceTimer, &QTimer::timeout, this, [this]() {
+    QObject::connect(m_debounceTimer, &QTimer::timeout, this, [this]() {
         // ========= 真正执行汇总更新 =========
 
         int enabledCount = 0;
@@ -2198,7 +2200,7 @@ void RealtimeMonitor::updateSummaryResult() {
             );
         }
     });
-    debounceTimer->start();
+    m_debounceTimer->start();
 }
 
 
