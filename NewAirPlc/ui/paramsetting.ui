@@ -1,0 +1,1026 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ParamSetting</class>
+ <widget class="QWidget" name="ParamSetting">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>650</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>气密仪上位机控制系统</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+/* ========== 全局样式 - 现代化设计 ========== */
+QWidget {
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    font-size: 16px;
+}
+
+/* 主背景 */
+QWidget#ParamSetting {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #e8f0f7, 
+        stop:0.5 #f5f8fc, 
+        stop:1 #e8f0f7);
+}
+
+/* ========== 标签样式 ========== */
+QLabel {
+    color: #334155;
+    font-weight: 500;
+}
+
+/* ========== 输入控件样式 ========== */
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox {
+    padding: 10px 14px;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 16px;
+    background-color: #ffffff;
+    color: #1e293b;
+    min-height: 36px;
+}
+
+QLineEdit:hover,
+QSpinBox:hover,
+QDoubleSpinBox:hover,
+QComboBox:hover {
+    border-color: #94a3b8;
+    background-color: #f8fafc;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus {
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ========== 下拉框样式 ========== */
+QComboBox::drop-down {
+    border: none;
+    background: transparent;
+    padding-right: 14px;
+    width: 36px;
+}
+
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid #64748b;
+    margin-right: 10px;
+}
+
+QComboBox QAbstractItemView {
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    background-color: #ffffff;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+    padding: 8px;
+    outline: none;
+    color: #1e293b;
+}
+
+QComboBox QAbstractItemView::item {
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin: 3px 5px;
+    min-height: 32px;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #60a5fa;
+    color: #ffffff;
+}
+
+/* ========== SpinBox 按钮样式 ========== */
+QSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::up-button,
+QDoubleSpinBox::down-button {
+    border: none;
+    background: transparent;
+    width: 28px;
+    border-radius: 8px;
+}
+
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover {
+    background-color: #eff6ff;
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 7px solid #64748b;
+}
+
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 7px solid #64748b;
+}
+
+/* ========== 滚动条样式 ========== */
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: #e2e8f0;
+    width: 14px;
+    border-radius: 7px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #94a3b8,
+        stop:1 #64748b);
+    border-radius: 7px;
+    min-height: 50px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #64748b,
+        stop:1 #475569);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+   </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="styleSheet">
+      <string notr="true">QScrollArea { border: none; }</string>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>764</width>
+        <height>1178</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="scrollLayout">
+       <property name="spacing">
+        <number>16</number>
+       </property>
+       <property name="leftMargin">
+        <number>12</number>
+       </property>
+       <property name="topMargin">
+        <number>12</number>
+       </property>
+       <property name="rightMargin">
+        <number>12</number>
+       </property>
+       <property name="bottomMargin">
+        <number>12</number>
+       </property>
+       <item>
+        <widget class="QGroupBox" name="programGroupBox">
+         <property name="styleSheet">
+          <string notr="true">
+QGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    margin-top: 18px;
+    padding: 20px;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 6px 16px;
+    color: #3b82f6;
+    font-weight: bold;
+    font-size: 18px;
+    background-color: white;
+    border-radius: 8px;
+    border: 2px solid #cbd5e1;
+}
+          </string>
+         </property>
+         <property name="title">
+          <string>📋 程序设置</string>
+         </property>
+         <layout class="QHBoxLayout" name="programLayout">
+          <item>
+           <widget class="QLabel" name="programNumberLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 17px;</string>
+            </property>
+            <property name="text">
+             <string>📋 程序号:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="programNumberComboBox">
+            <item>
+             <property name="text">
+              <string>1</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>2</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>3</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>4</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>5</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>6</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>7</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>8</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>9</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>10</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_program">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="saveParametersButton">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>42</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, 
+        stop:1 #2563eb);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    font-size: 17px;
+    font-weight: 700;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1d4ed8);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+QPushButton:pressed {
+    background: #1e40af;
+    padding: 13px 24px 11px 24px;
+}
+             </string>
+            </property>
+            <property name="text">
+             <string>💾 保存参数</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="sendToDeviceButton">
+            <property name="minimumSize">
+             <size>
+              <width>130</width>
+              <height>42</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #f59e0b, 
+        stop:1 #d97706);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    font-size: 17px;
+    font-weight: 700;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #d97706, 
+        stop:1 #b45309);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+}
+QPushButton:pressed {
+    background: #92400e;
+    padding: 13px 24px 11px 24px;
+}
+             </string>
+            </property>
+            <property name="text">
+             <string>📤 发送到设备</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="cycleTimeGroupBox">
+         <property name="styleSheet">
+          <string notr="true">
+QGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    margin-top: 18px;
+    padding: 20px;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 6px 16px;
+    color: #10b981;
+    font-weight: bold;
+    font-size: 18px;
+    background-color: white;
+    border-radius: 8px;
+    border: 2px solid #cbd5e1;
+}
+          </string>
+         </property>
+         <property name="title">
+          <string>⏱️ 时间参数</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout">
+          <property name="horizontalSpacing">
+           <number>16</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>14</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="fillLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>⏳ 填充时间:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="fillTimeSpinBox">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>s</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QLabel" name="stabilizationLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>⏱️ 稳定时间:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="4">
+           <widget class="QDoubleSpinBox" name="stabilizationTimeSpinBox">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="5">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>s</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="testTimeLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🔬 测试时间:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="testTimeSpinBox">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>s</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QLabel" name="dumpLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>💨 排气时间:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="4">
+           <widget class="QDoubleSpinBox" name="dumpTimeSpinBox">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>0.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="5">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>s</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="pressureGroupBox">
+         <property name="styleSheet">
+          <string notr="true">
+QGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    margin-top: 18px;
+    padding: 20px;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 6px 16px;
+    color: #f59e0b;
+    font-weight: bold;
+    font-size: 18px;
+    background-color: white;
+    border-radius: 8px;
+    border: 2px solid #cbd5e1;
+}
+          </string>
+         </property>
+         <property name="title">
+          <string>📊 压力参数</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <property name="horizontalSpacing">
+           <number>16</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>14</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="unitLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>📏 单位:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="pressureUnitComboBox">
+            <item>
+             <property name="text">
+              <string>Pa</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>kPa</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MPa</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>bar</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="maximumLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>⬆️ 最大压力:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QDoubleSpinBox" name="maxPressureSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="minimumLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>⬇️ 最小压力:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="minPressureSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="setFillLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🎯 填充压力:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QDoubleSpinBox" name="setFillSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="fillTypeLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🔄 填充类型:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="fillTypeComboBox">
+            <item>
+             <property name="text">
+              <string>Standard</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Quick</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Slow</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QLabel" name="regulatorPressureLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🔧 调压阀压力:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="3">
+           <widget class="QDoubleSpinBox" name="regulatorPressureSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="leakGroupBox">
+         <property name="styleSheet">
+          <string notr="true">
+QGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 14px;
+    border: 2px solid #cbd5e1;
+    margin-top: 18px;
+    padding: 20px;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 6px 16px;
+    color: #ef4444;
+    font-weight: bold;
+    font-size: 18px;
+    background-color: white;
+    border-radius: 8px;
+    border: 2px solid #cbd5e1;
+}
+          </string>
+         </property>
+         <property name="title">
+          <string>💧 泄露参数</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_3">
+          <property name="horizontalSpacing">
+           <number>16</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>14</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="leakUnitLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>📐 泄漏单位:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="leakUnitComboBox">
+            <item>
+             <property name="text">
+              <string>Pa/s</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>mL/min</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>cm³/h</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="testRejectLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🔍 测试允许泄漏:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QDoubleSpinBox" name="testRejectSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="refRejectLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>✅ 参考允许泄漏:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="refRejectSpinBox">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>999999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="offsetLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>↔️ 偏移量:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QDoubleSpinBox" name="offsetSpinBox">
+            <property name="minimum">
+             <double>-99999.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>99999.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="stdAtmLabel">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>🌡️ 标准大气压:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="stdAtmSpinBox">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string> hPa</string>
+            </property>
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>800.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1200.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>800.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QLabel" name="stdTempLabel">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>🌡️ 标准温度:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="3">
+           <widget class="QDoubleSpinBox" name="stdTempSpinBox">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="suffix">
+             <string> °C</string>
+            </property>
+            <property name="value">
+             <double>20.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="volumeLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>📦 容积:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="volumeSpinBox">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>65536</number>
+            </property>
+            <property name="value">
+             <number>100</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QLabel" name="volumeUnitLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>📏 容积单位:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="3">
+           <widget class="QComboBox" name="volumeUnitComboBox">
+            <item>
+             <property name="text">
+              <string>cm³</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>mL</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>L</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="rejectCalcLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #334155; font-size: 16px;</string>
+            </property>
+            <property name="text">
+             <string>🧮 泄漏计算方式:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QComboBox" name="rejectCalcComboBox">
+            <item>
+             <property name="text">
+              <string>Pa/s</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>%/min</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

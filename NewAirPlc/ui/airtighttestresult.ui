@@ -1,0 +1,675 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AirtightTestResult</class>
+ <widget class="QWidget" name="AirtightTestResult">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>气密仪测试结果</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+QWidget {
+    background-color: #f0f4f8;
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    color: #1a202c;
+}
+QLabel {
+    color: #374151;
+    background: transparent;
+    font-size: 12px;
+}
+QPushButton {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 13px;
+}
+QPushButton:hover {
+    background-color: #2563eb;
+}
+QPushButton:pressed {
+    background-color: #1d4ed8;
+}
+QPushButton:disabled {
+    background-color: #cbd5e1;
+    color: #94a3b8;
+}
+QTableView {
+    background-color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    gridline-color: #e2e8f0;
+    selection-background-color: #dbeafe;
+    selection-color: #1e40af;
+}
+QTableView::item {
+    padding: 6px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+}
+QTableView::item:selected {
+    background: #dbeafe;
+    color: #1e40af;
+}
+QHeaderView::section {
+    background-color: #f8fafc;
+    color: #475569;
+    padding: 8px 6px;
+    border: none;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 12px;
+}
+QComboBox {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    min-width: 70px;
+    font-size: 12px;
+}
+QComboBox:focus {
+    border-color: #3b82f6;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+QComboBox::down-arrow {
+    width: 12px;
+    height: 12px;
+}
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+    color: #1e293b;
+    padding: 6px;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    min-height: 30px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 2px 4px;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #60a5fa;
+    color: #ffffff;
+}
+QDateTimeEdit {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+QDateTimeEdit:focus {
+    border-color: #3b82f6;
+}
+QLineEdit {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+QLineEdit:focus {
+    border-color: #3b82f6;
+}
+QScrollBar:vertical {
+    background: #f1f5f9;
+    width: 10px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical {
+    background: #cbd5e1;
+    border-radius: 5px;
+    min-height: 30px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #94a3b8;
+}
+   </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>10</number>
+   </property>
+   <property name="leftMargin">
+    <number>12</number>
+   </property>
+   <property name="topMargin">
+    <number>12</number>
+   </property>
+   <property name="rightMargin">
+    <number>12</number>
+   </property>
+   <property name="bottomMargin">
+    <number>12</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="filterFrame">
+     <property name="styleSheet">
+      <string notr="true">
+QFrame#filterFrame {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+      </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <layout class="QVBoxLayout" name="filterMainLayout">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <property name="leftMargin">
+       <number>16</number>
+      </property>
+      <property name="topMargin">
+       <number>12</number>
+      </property>
+      <property name="rightMargin">
+       <number>16</number>
+      </property>
+      <property name="bottomMargin">
+       <number>12</number>
+      </property>
+      <item>
+       <layout class="QHBoxLayout" name="filterRow1">
+        <property name="spacing">
+         <number>12</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="filterIcon">
+          <property name="styleSheet">
+           <string notr="true">font-size: 18px;</string>
+          </property>
+          <property name="text">
+           <string>🔍</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_3">
+          <property name="styleSheet">
+           <string notr="true">font-weight: 500; color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>开始时间:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDateTimeEdit" name="startDateTimeEdit">
+          <property name="dateTime">
+           <datetime>
+            <hour>0</hour>
+            <minute>0</minute>
+            <second>0</second>
+            <year>2000</year>
+            <month>1</month>
+            <day>1</day>
+           </datetime>
+          </property>
+          <property name="calendarPopup">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_4">
+          <property name="styleSheet">
+           <string notr="true">font-weight: 500; color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>结束时间:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDateTimeEdit" name="endDateTimeEdit">
+          <property name="dateTime">
+           <datetime>
+            <hour>0</hour>
+            <minute>0</minute>
+            <second>0</second>
+            <year>2000</year>
+            <month>1</month>
+            <day>1</day>
+           </datetime>
+          </property>
+          <property name="calendarPopup">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer1">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="filterRow2">
+        <property name="spacing">
+         <number>12</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="label_6">
+          <property name="styleSheet">
+           <string notr="true">font-weight: 500; color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>测试结果:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="resultComboBox">
+          <item>
+           <property name="text">
+            <string>全部</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>通过</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>不通过</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="productNumberLabel">
+          <property name="styleSheet">
+           <string notr="true">font-weight: 500; color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>产品编号:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="productNumberLineEdit">
+          <property name="minimumSize">
+           <size>
+            <width>120</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="placeholderText">
+           <string>输入产品编号...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="inspectorLabel">
+          <property name="styleSheet">
+           <string notr="true">font-weight: 500; color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>质检人:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="inspectorComboBox">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>0</height>
+           </size>
+          </property>
+          <item>
+           <property name="text">
+            <string>全部</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="clearQueryButton">
+          <property name="styleSheet">
+           <string notr="true">background-color: #64748b;</string>
+          </property>
+          <property name="text">
+           <string>清空条件</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="exportButton">
+          <property name="styleSheet">
+           <string notr="true">background-color: #22c55e;</string>
+          </property>
+          <property name="text">
+           <string>📥 导出数据</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="tableFrame">
+     <property name="styleSheet">
+      <string notr="true">
+QFrame#tableFrame {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+      </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <layout class="QVBoxLayout" name="tableLayout">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QTableView" name="dataTableView">
+        <property name="styleSheet">
+         <string notr="true">
+QTableView {
+    border: none;
+    border-radius: 12px;
+}
+         </string>
+        </property>
+        <property name="horizontalScrollBarPolicy">
+         <enum>Qt::ScrollBarAlwaysOff</enum>
+        </property>
+        <property name="alternatingRowColors">
+         <bool>true</bool>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::ExtendedSelection</enum>
+        </property>
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="paginationFrame">
+     <property name="styleSheet">
+      <string notr="true">
+QFrame#paginationFrame {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+      </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <layout class="QHBoxLayout" name="bottomLayout">
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <property name="leftMargin">
+       <number>16</number>
+      </property>
+      <property name="topMargin">
+       <number>10</number>
+      </property>
+      <property name="rightMargin">
+       <number>16</number>
+      </property>
+      <property name="bottomMargin">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="recordCountLabel">
+        <property name="styleSheet">
+         <string notr="true">font-weight: 600; color: #3b82f6; font-size: 16px;</string>
+        </property>
+        <property name="text">
+         <string>📊 共 0 条记录</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="firstPageButton">
+        <property name="styleSheet">
+         <string notr="true">background-color: #64748b; padding: 6px 12px;</string>
+        </property>
+        <property name="text">
+         <string>⏮ 首页</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="prevPageButton">
+        <property name="styleSheet">
+         <string notr="true">background-color: #64748b; padding: 6px 12px;</string>
+        </property>
+        <property name="text">
+         <string>◀ 上一页</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="pageInfoFrame">
+        <property name="styleSheet">
+         <string notr="true">
+QFrame#pageInfoFrame {
+    background-color: #f1f5f9;
+    border-radius: 8px;
+    padding: 4px 12px;
+}
+         </string>
+        </property>
+        <layout class="QHBoxLayout" name="pageInfoLayout">
+         <property name="spacing">
+          <number>4</number>
+         </property>
+         <property name="leftMargin">
+          <number>12</number>
+         </property>
+         <property name="topMargin">
+          <number>4</number>
+         </property>
+         <property name="rightMargin">
+          <number>12</number>
+         </property>
+         <property name="bottomMargin">
+          <number>4</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="pageInfoLabel">
+           <property name="styleSheet">
+            <string notr="true">font-weight: 600; color: #475569;</string>
+           </property>
+           <property name="text">
+            <string>第 1 / 1 页</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="nextPageButton">
+        <property name="styleSheet">
+         <string notr="true">background-color: #64748b; padding: 6px 12px;</string>
+        </property>
+        <property name="text">
+         <string>下一页 ▶</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="lastPageButton">
+        <property name="styleSheet">
+         <string notr="true">background-color: #64748b; padding: 6px 12px;</string>
+        </property>
+        <property name="text">
+         <string>末页 ⏭</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="divider">
+        <property name="styleSheet">
+         <string notr="true">background-color: #e2e8f0; max-width: 1px;</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::VLine</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="pageSizeLabel">
+        <property name="styleSheet">
+         <string notr="true">font-weight: 500; color: #64748b;</string>
+        </property>
+        <property name="text">
+         <string>每页:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="pageSizeComboBox">
+        <property name="minimumSize">
+         <size>
+          <width>70</width>
+          <height>0</height>
+         </size>
+        </property>
+        <item>
+         <property name="text">
+          <string>20</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>50</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>100</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>200</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lastUpdateLabel">
+        <property name="styleSheet">
+         <string notr="true">color: #94a3b8; font-size: 14px;</string>
+        </property>
+        <property name="text">
+         <string>🕐 最后更新: --</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

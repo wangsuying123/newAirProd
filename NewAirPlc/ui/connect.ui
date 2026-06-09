@@ -1,0 +1,2812 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ConnectWidget</class>
+ <widget class="QWidget" name="ConnectWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>设备连接参数设置</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+/* ========== 全局样式 - 现代化设计 ========== */
+QWidget {
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    font-size: 14px;
+}
+/* 主背景渐变 */
+QWidget#ConnectWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #dbeafe, 
+        stop:0.5 #f0f9ff, 
+        stop:1 #dbeafe);
+}
+/* ========== 按钮样式 ========== */
+QPushButton {
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    min-height: 40px;
+    border: none;
+    letter-spacing: 0.5px;
+}
+QPushButton:hover {
+    transform: translateY(-1px);
+}
+QPushButton:pressed {
+    transform: translateY(0);
+}
+QPushButton:disabled {
+    opacity: 0.5;
+}
+/* ========== 输入控件样式 ========== */
+QLineEdit,
+QSpinBox,
+QComboBox {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background-color: #ffffff;
+    color: #1e293b;
+    min-height: 32px;
+}
+QLineEdit:hover,
+QSpinBox:hover,
+QComboBox:hover {
+    border-color: #cbd5e1;
+    background-color: #f8fafc;
+}
+QLineEdit:focus,
+QSpinBox:focus,
+QComboBox:focus {
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    outline: none;
+}
+/* ========== 下拉框样式 ========== */
+QComboBox::drop-down {
+    border: none;
+    background: transparent;
+    padding-right: 12px;
+    width: 32px;
+}
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #64748b;
+    margin-right: 8px;
+}
+QComboBox QAbstractItemView {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background-color: #ffffff;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+    color: #1e293b;
+    padding: 6px;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin: 2px 4px;
+    min-height: 30px;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #60a5fa;
+    color: #ffffff;
+}
+/* ========== SpinBox 按钮样式 ========== */
+QSpinBox::up-button,
+QSpinBox::down-button {
+    border: none;
+    background: transparent;
+    width: 24px;
+    border-radius: 6px;
+}
+QSpinBox::up-button:hover,
+QSpinBox::down-button:hover {
+    background-color: #f1f5f9;
+}
+QSpinBox::up-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 6px solid #64748b;
+}
+QSpinBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #64748b;
+}
+/* ========== 标签样式 ========== */
+QLabel {
+    color: #1e293b;
+}
+/* ========== 滚动条样式 ========== */
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+QScrollBar:vertical {
+    border: none;
+    background: #f1f5f9;
+    width: 12px;
+    border-radius: 6px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #cbd5e1,
+        stop:1 #94a3b8);
+    border-radius: 6px;
+    min-height: 40px;
+}
+QScrollBar::handle:vertical:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #94a3b8,
+        stop:1 #64748b);
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+    height: 0px;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+/* ========== 标签页样式 ========== */
+QTabWidget::pane {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+    top: -2px;
+}
+QTabBar::tab {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f8fafc,
+        stop:1 #f1f5f9);
+    border: 2px solid #e2e8f0;
+    border-bottom: none;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    padding: 12px 24px;
+    margin-right: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #64748b;
+}
+QTabBar::tab:selected {
+    background: white;
+    color: #3b82f6;
+    border-bottom: 2px solid white;
+    margin-bottom: -2px;
+}
+QTabBar::tab:hover:!selected {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f1f5f9,
+        stop:1 #e2e8f0);
+    color: #475569;
+}
+   </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_4">
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="styleSheet">
+      <string notr="true">QScrollArea { border: none; }</string>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>780</width>
+        <height>500</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_8">
+       <property name="spacing">
+        <number>16</number>
+       </property>
+       <property name="leftMargin">
+        <number>16</number>
+       </property>
+       <property name="topMargin">
+        <number>16</number>
+       </property>
+       <property name="rightMargin">
+        <number>16</number>
+       </property>
+       <property name="bottomMargin">
+        <number>16</number>
+       </property>
+       <item>
+        <widget class="QFrame" name="statusBarFrame">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>120</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>120</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">
+QFrame#statusBarFrame {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #f8fafc, 
+        stop:0.5 #ffffff,
+        stop:1 #f8fafc);
+    border-radius: 20px;
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #e0e7ff,
+        stop:0.5 #dbeafe,
+        stop:1 #e0e7ff);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+          </string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <layout class="QHBoxLayout" name="statusBarLayout">
+          <property name="spacing">
+           <number>20</number>
+          </property>
+          <property name="leftMargin">
+           <number>24</number>
+          </property>
+          <property name="topMargin">
+           <number>20</number>
+          </property>
+          <property name="rightMargin">
+           <number>24</number>
+          </property>
+          <property name="bottomMargin">
+           <number>20</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="statusBarTitle">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+font-size: 20px; 
+font-weight: 800; 
+color: #1e40af;
+background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+    stop:0 #3b82f6,
+    stop:1 #2563eb);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+letter-spacing: 1px;
+             </string>
+            </property>
+            <property name="text">
+             <string>📊 设备状态</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="statusBarLine">
+            <property name="minimumSize">
+             <size>
+              <width>2</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>2</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+    stop:0 #dbeafe,
+    stop:0.5 #93c5fd,
+    stop:1 #dbeafe);
+border-radius: 1px;</string>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QWidget" name="plcStatusBarWidget" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>150</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QWidget#plcStatusBarWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 0.8),
+        stop:1 rgba(248, 250, 252, 0.8));
+    border-radius: 14px;
+    border: 2px solid rgba(226, 232, 240, 0.6);
+    padding: 12px;
+}
+QWidget#plcStatusBarWidget:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 1),
+        stop:1 rgba(239, 246, 255, 0.9));
+    border: 2px solid rgba(147, 197, 253, 0.8);
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="plcStatusBarLayout">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>8</number>
+             </property>
+             <property name="topMargin">
+              <number>8</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <property name="bottomMargin">
+              <number>8</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="plcStatusBarIcon">
+               <property name="minimumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">
+font-size: 32px; 
+background: transparent;
+               </string>
+               </property>
+               <property name="text">
+                <string>🔌</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="plcStatusBarVLayout">
+               <property name="spacing">
+                <number>4</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="plcStatusBarLabel">
+                 <property name="styleSheet">
+                  <string notr="true">
+font-size: 15px; 
+font-weight: 700; 
+color: #334155; 
+background: transparent;
+letter-spacing: 0.5px;
+                  </string>
+                 </property>
+                 <property name="text">
+                  <string>PLC</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="plcStatusBarIndicatorLayout">
+                 <property name="spacing">
+                  <number>8</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="plcStatusBarIndicator">
+                   <property name="minimumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">
+background-color: #ef4444; 
+border-radius: 7px;
+border: 2px solid rgba(239, 68, 68, 0.3);
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="plcStatusBarText">
+                   <property name="styleSheet">
+                    <string notr="true">
+font-size: 13px; 
+font-weight: 600;
+color: #64748b; 
+background: transparent;
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string>未连接</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="statusBarLine2">
+            <property name="minimumSize">
+             <size>
+              <width>2</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>2</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+    stop:0 #dbeafe,
+    stop:0.5 #93c5fd,
+    stop:1 #dbeafe);
+border-radius: 1px;</string>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QWidget" name="airStatusBarWidget" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>150</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QWidget#airStatusBarWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 0.8),
+        stop:1 rgba(248, 250, 252, 0.8));
+    border-radius: 14px;
+    border: 2px solid rgba(226, 232, 240, 0.6);
+    padding: 12px;
+}
+QWidget#airStatusBarWidget:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 1),
+        stop:1 rgba(239, 246, 255, 0.9));
+    border: 2px solid rgba(147, 197, 253, 0.8);
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="airStatusBarLayout">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>8</number>
+             </property>
+             <property name="topMargin">
+              <number>8</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <property name="bottomMargin">
+              <number>8</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="airStatusBarIcon">
+               <property name="minimumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">
+font-size: 32px; 
+background: transparent;
+               </string>
+               </property>
+               <property name="text">
+                <string>💨</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="airStatusBarVLayout">
+               <property name="spacing">
+                <number>4</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="airStatusBarLabel">
+                 <property name="styleSheet">
+                  <string notr="true">
+font-size: 15px; 
+font-weight: 700; 
+color: #334155; 
+background: transparent;
+letter-spacing: 0.5px;
+                  </string>
+                 </property>
+                 <property name="text">
+                  <string>气密仪</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="airStatusBarIndicatorLayout">
+                 <property name="spacing">
+                  <number>8</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="airStatusBarIndicator">
+                   <property name="minimumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">
+background-color: #ef4444; 
+border-radius: 7px;
+border: 2px solid rgba(239, 68, 68, 0.3);
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="airStatusBarText">
+                   <property name="styleSheet">
+                    <string notr="true">
+font-size: 13px; 
+font-weight: 600;
+color: #64748b; 
+background: transparent;
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string>未连接</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="statusBarLine3">
+            <property name="minimumSize">
+             <size>
+              <width>2</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>2</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+    stop:0 #dbeafe,
+    stop:0.5 #93c5fd,
+    stop:1 #dbeafe);
+border-radius: 1px;</string>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QWidget" name="pressureStatusBarWidget" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>150</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QWidget#pressureStatusBarWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 0.8),
+        stop:1 rgba(248, 250, 252, 0.8));
+    border-radius: 14px;
+    border: 2px solid rgba(226, 232, 240, 0.6);
+    padding: 12px;
+}
+QWidget#pressureStatusBarWidget:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255, 255, 255, 1),
+        stop:1 rgba(239, 246, 255, 0.9));
+    border: 2px solid rgba(147, 197, 253, 0.8);
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="pressureStatusBarLayout">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <property name="leftMargin">
+              <number>8</number>
+             </property>
+             <property name="topMargin">
+              <number>8</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <property name="bottomMargin">
+              <number>8</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="pressureStatusBarIcon">
+               <property name="minimumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>40</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">
+font-size: 32px; 
+background: transparent;
+               </string>
+               </property>
+               <property name="text">
+                <string>🌪️</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="pressureStatusBarVLayout">
+               <property name="spacing">
+                <number>4</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="pressureStatusBarLabel">
+                 <property name="styleSheet">
+                  <string notr="true">
+font-size: 15px; 
+font-weight: 700; 
+color: #334155; 
+background: transparent;
+letter-spacing: 0.5px;
+                  </string>
+                 </property>
+                 <property name="text">
+                  <string>调压装置</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="pressureStatusBarIndicatorLayout">
+                 <property name="spacing">
+                  <number>8</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="pressureStatusBarIndicator">
+                   <property name="minimumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>14</width>
+                     <height>14</height>
+                    </size>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">
+background-color: #ef4444; 
+border-radius: 7px;
+border: 2px solid rgba(239, 68, 68, 0.3);
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="pressureStatusBarText">
+                   <property name="styleSheet">
+                    <string notr="true">
+font-size: 13px; 
+font-weight: 600;
+color: #64748b; 
+background: transparent;
+                    </string>
+                   </property>
+                   <property name="text">
+                    <string>未连接</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="statusBarSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="tabWidget">
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <!-- 标签页: PLC连接 -->
+         <widget class="QWidget" name="plcTab">
+          <attribute name="title">
+           <string>🔌 PLC连接</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="plcTabLayout">
+           <property name="spacing">
+            <number>16</number>
+           </property>
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="topMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <property name="bottomMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="plcStatusWidget" native="true">
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#plcStatusWidget {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 rgba(219, 234, 254, 0.95), 
+        stop:0.5 rgba(255, 255, 255, 0.98),
+        stop:1 rgba(191, 219, 254, 0.95));
+    border-radius: 16px;
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #93c5fd,
+        stop:0.5 #60a5fa,
+        stop:1 #93c5fd);
+    padding: 16px 20px;
+}
+QWidget#plcStatusWidget:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 rgba(239, 246, 255, 1), 
+        stop:0.5 rgba(255, 255, 255, 1),
+        stop:1 rgba(239, 246, 255, 1));
+    border: 3px solid #3b82f6;
+}
+              </string>
+             </property>
+             <layout class="QHBoxLayout" name="plcStatusHLayout">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <layout class="QHBoxLayout" name="plcStatusLeftLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="plcIconLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>40</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>40</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+font-size: 32px; 
+background: transparent;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="plcStatusTitle">
+                  <property name="styleSheet">
+                   <string notr="true">
+font-weight: 800; 
+font-size: 17px; 
+color: #1e40af; 
+background: transparent;
+letter-spacing: 1px;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>PLC 连接状态</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <spacer name="plcStatusSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <layout class="QVBoxLayout" name="plcStatusRightLayout">
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+                <item>
+                 <layout class="QHBoxLayout" name="plcStatusIndicatorLayout">
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="plcConnectStatus">
+                    <property name="styleSheet">
+                     <string notr="true">
+font-size: 15px; 
+font-weight: 700; 
+color: #334155; 
+background: transparent;
+                     </string>
+                    </property>
+                    <property name="text">
+                     <string>未连接</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="plcStatusIndicator">
+                    <property name="minimumSize">
+                     <size>
+                      <width>14</width>
+                      <height>14</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>14</width>
+                      <height>14</height>
+                     </size>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true">
+background-color: #ef4444; 
+border-radius: 7px; 
+border: 3px solid rgba(252, 165, 165, 0.6);
+                     </string>
+                    </property>
+                    <property name="text">
+                     <string/>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QLabel" name="plcLastConnect">
+                  <property name="styleSheet">
+                   <string notr="true">
+font-size: 13px; 
+font-weight: 500;
+color: #64748b; 
+background: transparent;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>📍最后连接：从未连接</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="plcParamsWidget" native="true">
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#plcParamsWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 rgba(255, 255, 255, 0.98), 
+        stop:1 rgba(248, 250, 252, 0.95));
+    border-radius: 18px;
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #e0e7ff,
+        stop:0.5 #dbeafe,
+        stop:1 #e0e7ff);
+    padding: 16px;
+}
+QWidget#plcParamsWidget:hover {
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #93c5fd,
+        stop:0.5 #60a5fa,
+        stop:1 #93c5fd);
+}
+              </string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_5">
+              <item>
+               <widget class="QLabel" name="plcParamsTitle">
+                <property name="styleSheet">
+                 <string notr="true">
+font-size: 17px; 
+font-weight: 800; 
+padding-bottom: 10px; 
+border-bottom: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+    stop:0 #93c5fd,
+    stop:0.5 #60a5fa,
+    stop:1 #93c5fd);
+color: #1e40af;
+letter-spacing: 1px;
+                 </string>
+                </property>
+                <property name="text">
+                 <string>🔧 PLC 连接参数</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QFormLayout" name="formLayout">
+                <property name="horizontalSpacing">
+                 <number>16</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>6</number>
+                </property>
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>6</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>6</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="plcProtocolLabel">
+                  <property name="styleSheet">
+                   <string notr="true">
+font-size: 14px; 
+color: #334155; 
+font-weight: 700;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>📡 通信协议</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QComboBox" name="plcProtocolCombo">
+                  <item>
+                   <property name="text">
+                    <string>Modbus TCP</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>Modbus RTU</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="plcIpLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🌐 IP地址</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QLineEdit" name="plcIpEdit">
+                  <property name="text">
+                   <string>192.168.1.10</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="plcPortLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 端口号</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QSpinBox" name="plcPortSpin">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>65535</number>
+                  </property>
+                  <property name="value">
+                   <number>502</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="plcSerialLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 串口号</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <widget class="QComboBox" name="plcSerialCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>COM1</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM2</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM3</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM4</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM5</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="6" column="0">
+                 <widget class="QLabel" name="plcBaudrateLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 波特率</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="1">
+                 <widget class="QComboBox" name="plcBaudrateCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>9600</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>19200</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>38400</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>57600</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>115200</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="7" column="0">
+                 <widget class="QLabel" name="plcDatabitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 数据位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="7" column="1">
+                 <widget class="QComboBox" name="plcDatabitsCombo">
+                  <property name="currentIndex">
+                   <number>3</number>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>5</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>6</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>7</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>8</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="8" column="0">
+                 <widget class="QLabel" name="plcParityLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔍 校验位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="8" column="1">
+                 <widget class="QComboBox" name="plcParityCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>无</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>奇校验</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>偶校验</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="9" column="0">
+                 <widget class="QLabel" name="plcStopbitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>⏹️ 停止位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="9" column="1">
+                 <widget class="QComboBox" name="plcStopbitsCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>1</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>1.5</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>2</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="plcButtonLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <property name="topMargin">
+                 <number>16</number>
+                </property>
+                <item>
+                 <widget class="QPushButton" name="plcConnectBtn">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, 
+        stop:1 #2563eb);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1d4ed8);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #1e40af;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 连接</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="plcDisconnectBtn">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ef4444, 
+        stop:1 #dc2626);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #dc2626, 
+        stop:1 #b91c1c);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #991b1b;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>⏏️ 断开</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="plcMessageLabel">
+                <property name="styleSheet">
+                 <string notr="true">font-size: 12px; padding: 6px; border-radius: 4px;</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="hidden" stdset="0">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <!-- 标签页: 气密仪连接 -->
+         <widget class="QWidget" name="airTab">
+          <attribute name="title">
+           <string>💨 气密仪连接</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="airTabLayout">
+           <property name="spacing">
+            <number>16</number>
+           </property>
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="topMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <property name="bottomMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="airStatusWidget" native="true">
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#airStatusWidget {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 rgba(219, 234, 254, 0.95), 
+        stop:0.5 rgba(255, 255, 255, 0.98),
+        stop:1 rgba(191, 219, 254, 0.95));
+    border-radius: 16px;
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #93c5fd,
+        stop:0.5 #60a5fa,
+        stop:1 #93c5fd);
+    padding: 16px 20px;
+}
+QWidget#airStatusWidget:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 rgba(239, 246, 255, 1), 
+        stop:0.5 rgba(255, 255, 255, 1),
+        stop:1 rgba(239, 246, 255, 1));
+    border: 3px solid #3b82f6;
+}
+              </string>
+             </property>
+             <layout class="QHBoxLayout" name="airStatusHLayout">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <layout class="QHBoxLayout" name="airStatusLeftLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="airIconLabel">
+                  <property name="minimumSize">
+                   <size>
+                    <width>40</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>40</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+font-size: 32px; 
+background: transparent;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>💨</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="airStatusTitle">
+                  <property name="styleSheet">
+                   <string notr="true">
+font-weight: 800; 
+font-size: 17px; 
+color: #1e40af; 
+background: transparent;
+letter-spacing: 1px;
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>气密仪连接状态</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <spacer name="airStatusSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <layout class="QVBoxLayout" name="airStatusRightLayout">
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+                <item>
+                 <layout class="QHBoxLayout" name="airStatusIndicatorLayout">
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="airConnectStatus">
+                    <property name="styleSheet">
+                     <string notr="true">font-size: 14px; font-weight: 600; color: #475569; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>未连接</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="airStatusIndicator">
+                    <property name="minimumSize">
+                     <size>
+                      <width>12</width>
+                      <height>12</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>12</width>
+                      <height>12</height>
+                     </size>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true">background-color: #ef4444; border-radius: 6px; border: 2px solid #fca5a5;</string>
+                    </property>
+                    <property name="text">
+                     <string/>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QLabel" name="airLastConnect">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 12px; color: #64748b; background: transparent;</string>
+                  </property>
+                  <property name="text">
+                   <string>📍最后连接：从未连接</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="airParamsWidget" native="true">
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#airParamsWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 rgba(255, 255, 255, 0.98), 
+        stop:1 rgba(248, 250, 252, 0.95));
+    border-radius: 18px;
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #e0e7ff,
+        stop:0.5 #dbeafe,
+        stop:1 #e0e7ff);
+    padding: 16px;
+}
+QWidget#airParamsWidget:hover {
+    border: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #93c5fd,
+        stop:0.5 #60a5fa,
+        stop:1 #93c5fd);
+}
+              </string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <widget class="QLabel" name="airParamsTitle">
+                <property name="styleSheet">
+                 <string notr="true">
+font-size: 17px; 
+font-weight: 800; 
+padding-bottom: 10px; 
+border-bottom: 3px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+    stop:0 #93c5fd,
+    stop:0.5 #60a5fa,
+    stop:1 #93c5fd);
+color: #1e40af;
+letter-spacing: 1px;
+                 </string>
+                </property>
+                <property name="text">
+                 <string>🔧 气密仪连接参数</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QFormLayout" name="airFormLayout">
+                <property name="horizontalSpacing">
+                 <number>16</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>6</number>
+                </property>
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>6</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>6</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="airConnectionTypeLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📡 连接方式</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QComboBox" name="airConnectionTypeCombo">
+                  <item>
+                   <property name="text">
+                    <string>串口</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>以太网</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="airSerialLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 串口号</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QComboBox" name="airSerialCombo">
+                  <item>
+                   <property name="text">
+                    <string>COM1</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM2</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM3</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM4</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>COM5</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="airIpLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🌐 IP地址</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QLineEdit" name="airIpEdit">
+                  <property name="text">
+                   <string>192.168.1.10</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="airPortLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 端口号</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <widget class="QSpinBox" name="airPortSpin">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>65535</number>
+                  </property>
+                  <property name="value">
+                   <number>502</number>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="0">
+                 <widget class="QLabel" name="airBaudrateLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 波特率</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="1">
+                 <widget class="QComboBox" name="airBaudrateCombo">
+                  <property name="currentIndex">
+                   <number>2</number>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>2400</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>4800</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>9600</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>19200</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>38400</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>115200</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="5" column="0">
+                 <widget class="QLabel" name="airDatabitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 数据位</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="5" column="1">
+                 <widget class="QComboBox" name="airDatabitsCombo">
+                  <property name="currentIndex">
+                   <number>1</number>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>7</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>8</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="6" column="0">
+                 <widget class="QLabel" name="airParityLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔍 校验位</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="1">
+                 <widget class="QComboBox" name="airParityCombo">
+                  <item>
+                   <property name="text">
+                    <string>无</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>奇校验</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>偶校验</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="7" column="0">
+                 <widget class="QLabel" name="airStopbitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>⏹️ 停止位</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="7" column="1">
+                 <widget class="QComboBox" name="airStopbitsCombo">
+                  <item>
+                   <property name="text">
+                    <string>1</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>2</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="airButtonLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <property name="topMargin">
+                 <number>16</number>
+                </property>
+                <item>
+                 <widget class="QPushButton" name="airConnectBtn">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, 
+        stop:1 #2563eb);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1d4ed8);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #1e40af;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 连接</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="airDisconnectBtn">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ef4444, 
+        stop:1 #dc2626);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #dc2626, 
+        stop:1 #b91c1c);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #991b1b;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 断开</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="airMessageLabel">
+                <property name="styleSheet">
+                 <string notr="true">font-size: 16px; padding: 6px; border-radius: 4px;</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="hidden" stdset="0">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <!-- 标签页: 调压装置通讯 -->
+         <widget class="QWidget" name="commTab">
+          <attribute name="title">
+           <string>🌪️ 调压装置通讯</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="commTabLayout">
+           <property name="spacing">
+            <number>16</number>
+           </property>
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="topMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <property name="bottomMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="pressureStatusWidget" native="true">
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>80</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#pressureStatusWidget {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+        stop:0 #fef3c7, 
+        stop:1 #fde68a);
+    border-radius: 12px;
+    border: 2px solid #fcd34d;
+    padding: 12px 16px;
+}
+              </string>
+             </property>
+             <layout class="QHBoxLayout" name="pressureStatusHLayout">
+              <property name="spacing">
+               <number>16</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <layout class="QHBoxLayout" name="pressureStatusLeftLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="pressureIconLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 24px; background: transparent;</string>
+                  </property>
+                  <property name="text">
+                   <string>🌪️</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="pressureStatusTitle">
+                  <property name="styleSheet">
+                   <string notr="true">font-weight: bold; font-size: 15px; color: #92400e; background: transparent;</string>
+                  </property>
+                  <property name="text">
+                   <string>调压装置状态</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <spacer name="pressureStatusSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <layout class="QVBoxLayout" name="pressureStatusRightLayout">
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+                <item>
+                 <layout class="QHBoxLayout" name="pressureStatusIndicatorLayout">
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="pressureConnectStatus">
+                    <property name="styleSheet">
+                     <string notr="true">font-size: 14px; font-weight: 600; color: #475569; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>未连接</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="pressureStatusIndicator">
+                    <property name="minimumSize">
+                     <size>
+                      <width>12</width>
+                      <height>12</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>12</width>
+                      <height>12</height>
+                     </size>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true">background-color: #ef4444; border-radius: 6px; border: 2px solid #fca5a5;</string>
+                    </property>
+                    <property name="text">
+                     <string/>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QLabel" name="pressureLastConnect">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 12px; color: #64748b; background: transparent;</string>
+                  </property>
+                  <property name="text">
+                   <string>📍最后连接：从未连接</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="connectionParamsWidget" native="true">
+             <property name="styleSheet">
+              <string notr="true">
+QWidget#connectionParamsWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 16px;
+    border: 2px solid #e2e8f0;
+    padding: 12px;
+}
+              </string>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_9">
+              <item>
+               <widget class="QLabel" name="connectionParamsTitle">
+                <property name="styleSheet">
+                 <string notr="true">font-size: 15px; font-weight: bold; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; color: #92400e;</string>
+                </property>
+                <property name="text">
+                 <string>🔧 连接参数</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <layout class="QFormLayout" name="formLayout_2">
+                <property name="horizontalSpacing">
+                 <number>16</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>6</number>
+                </property>
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>6</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>6</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="protocolLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📡 通信协议</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QComboBox" name="protocolComboBox">
+                  <item>
+                   <property name="text">
+                    <string>Modbus TCP</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>Modbus RTU</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="ipLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🌐 IP地址</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QLineEdit" name="ipLineEdit">
+                  <property name="text">
+                   <string>192.168.1.10</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="portLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 端口号</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QSpinBox" name="portSpinBox">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>65535</number>
+                  </property>
+                  <property name="value">
+                   <number>502</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="serialPortLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 串口号</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <layout class="QHBoxLayout" name="serialPortLayout">
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <widget class="QComboBox" name="serialPortCombo">
+                    <property name="hidden" stdset="0">
+                     <bool>true</bool>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string>COM1</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>COM2</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>COM3</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>COM4</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>COM5</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QPushButton" name="refreshSerialPortBtn">
+                    <property name="minimumSize">
+                     <size>
+                      <width>80</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>80</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #10b981, 
+        stop:1 #059669);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #059669, 
+        stop:1 #047857);
+}
+QPushButton:pressed {
+    background: #047857;
+}
+                     </string>
+                    </property>
+                    <property name="text">
+                     <string>🔄 刷新</string>
+                    </property>
+                    <property name="hidden" stdset="0">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item row="4" column="0">
+                 <widget class="QLabel" name="baudrateLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 波特率</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="1">
+                 <widget class="QComboBox" name="baudrateCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>9600</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>19200</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>38400</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>57600</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>115200</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="5" column="0">
+                 <widget class="QLabel" name="databitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>📊 数据位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="5" column="1">
+                 <widget class="QComboBox" name="databitsCombo">
+                  <property name="currentIndex">
+                   <number>3</number>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>5</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>6</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>7</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>8</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="6" column="0">
+                 <widget class="QLabel" name="parityLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>🔍 校验位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="1">
+                 <widget class="QComboBox" name="parityCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>无</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>奇校验</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>偶校验</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+                <item row="7" column="0">
+                 <widget class="QLabel" name="stopbitsLabel">
+                  <property name="styleSheet">
+                   <string notr="true">font-size: 14px; color: #475569; font-weight: 600;</string>
+                  </property>
+                  <property name="text">
+                   <string>⏹️ 停止位</string>
+                  </property>
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="7" column="1">
+                 <widget class="QComboBox" name="stopbitsCombo">
+                  <property name="hidden" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                  <item>
+                   <property name="text">
+                    <string>1</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>1.5</string>
+                   </property>
+                  </item>
+                  <item>
+                   <property name="text">
+                    <string>2</string>
+                   </property>
+                  </item>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="pressureButtonLayout">
+                <property name="spacing">
+                 <number>12</number>
+                </property>
+                <property name="topMargin">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="QPushButton" name="connectButton">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, 
+        stop:1 #2563eb);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1d4ed8);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #1e40af;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 连接</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="disconnectButton">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>100</width>
+                    <height>48</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ef4444, 
+        stop:1 #dc2626);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #dc2626, 
+        stop:1 #b91c1c);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+QPushButton:pressed {
+    background: #991b1b;
+    padding: 6px 8px 2px 8px;
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+                   </string>
+                  </property>
+                  <property name="text">
+                   <string>🔌 断开</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

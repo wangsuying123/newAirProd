@@ -1,0 +1,579 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>UserManagement</class>
+ <widget class="QWidget" name="UserManagement">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>650</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>用户管理</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+/* 全局样式 */
+QWidget {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+        stop:0 #4facfe, 
+        stop:0.5 #00f2fe,
+        stop:1 #43e97b);
+    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+}
+
+/* 按钮样式 */
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #dbeafe,
+        stop:1 #bfdbfe);
+    color: #1e40af;
+    border: 2px solid #93c5fd;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    min-height: 38px;
+}
+
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #bfdbfe,
+        stop:1 #93c5fd);
+    border: 2px solid #60a5fa;
+}
+
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #60a5fa,
+        stop:1 #3b82f6);
+    border: 2px solid #2563eb;
+    color: white;
+}
+
+QPushButton:disabled {
+    background-color: #f1f5f9;
+    border: 2px solid #e2e8f0;
+    color: #94a3b8;
+}
+
+/* 添加按钮 */
+QPushButton#addButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #d1fae5,
+        stop:1 #a7f3d0);
+    border: 2px solid #6ee7b7;
+    color: #065f46;
+}
+
+QPushButton#addButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #a7f3d0,
+        stop:1 #6ee7b7);
+    border: 2px solid #34d399;
+}
+
+/* 删除按钮 */
+QPushButton#deleteButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #fee2e2,
+        stop:1 #fecaca);
+    border: 2px solid #fca5a5;
+    color: #991b1b;
+}
+
+QPushButton#deleteButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #fecaca,
+        stop:1 #fca5a5);
+    border: 2px solid #f87171;
+}
+
+/* 表格样式 */
+QTableWidget {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 2px solid #bfdbfe;
+    border-radius: 10px;
+    gridline-color: #e2e8f0;
+    selection-background-color: #3b82f6;
+    selection-color: white;
+}
+
+QTableWidget::item {
+    padding: 8px;
+}
+
+QTableWidget::item:selected {
+    background-color: #3b82f6;
+    color: white;
+}
+
+QHeaderView::section {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3b82f6,
+        stop:1 #2563eb);
+    color: white;
+    padding: 10px;
+    border: none;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+QHeaderView::section:first {
+    border-top-left-radius: 8px;
+}
+
+QHeaderView::section:last {
+    border-top-right-radius: 8px;
+}
+
+/* 滚动条 */
+QScrollBar:vertical {
+    background: rgba(255, 255, 255, 0.3);
+    width: 10px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(59, 130, 246, 0.7);
+    border-radius: 5px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: rgba(37, 99, 235, 0.9);
+}
+
+QScrollBar::add-line:vertical, 
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+   </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>12</number>
+   </property>
+   <property name="leftMargin">
+    <number>15</number>
+   </property>
+   <property name="topMargin">
+    <number>15</number>
+   </property>
+   <property name="rightMargin">
+    <number>15</number>
+   </property>
+   <property name="bottomMargin">
+    <number>15</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="titleFrame">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>60</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">
+#titleFrame {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #4facfe, 
+        stop:0.5 #00f2fe,
+        stop:1 #43e97b);
+    border-radius: 12px;
+    border: none;
+}
+      </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <layout class="QHBoxLayout" name="titleLayout">
+      <property name="leftMargin">
+       <number>20</number>
+      </property>
+      <property name="topMargin">
+       <number>15</number>
+      </property>
+      <property name="rightMargin">
+       <number>20</number>
+      </property>
+      <property name="bottomMargin">
+       <number>15</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="titleLabel">
+        <property name="styleSheet">
+         <string notr="true">
+font-size: 24px;
+font-weight: 700;
+color: white;
+letter-spacing: 2px;
+background: transparent;
+         </string>
+        </property>
+        <property name="text">
+         <string>👥 用户管理</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="titleSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="contentFrame">
+     <property name="styleSheet">
+      <string notr="true">
+#contentFrame {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 2px solid #bfdbfe;
+    border-radius: 12px;
+}
+      </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <layout class="QVBoxLayout" name="contentLayout">
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <property name="leftMargin">
+       <number>15</number>
+      </property>
+      <property name="topMargin">
+       <number>15</number>
+      </property>
+      <property name="rightMargin">
+       <number>15</number>
+      </property>
+      <property name="bottomMargin">
+       <number>15</number>
+      </property>
+      <item>
+       <layout class="QHBoxLayout" name="buttonLayout">
+        <property name="spacing">
+         <number>10</number>
+        </property>
+        <item>
+         <widget class="QPushButton" name="addButton">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>42</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>➕ 添加用户</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="editButton">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>42</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>✏️ 编辑用户</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="deleteButton">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>42</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>🗑️ 删除用户</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="resetPasswordButton">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>42</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>🔑 重置密码</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="buttonSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="refreshButton">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>42</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>🔄 刷新</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="userTable">
+        <property name="editTriggers">
+         <set>QAbstractItemView::NoEditTriggers</set>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::SingleSelection</enum>
+        </property>
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+        <property name="sortingEnabled">
+         <bool>false</bool>
+        </property>
+        <column>
+         <property name="text">
+          <string>ID</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>用户名</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>真实姓名</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>角色</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>状态</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>创建时间</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>最后登录</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>描述</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="paginationFrame">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>50</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">
+#paginationFrame {
+    background-color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 8px;
+}
+
+QLabel {
+    background: transparent;
+    color: #1e40af;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QPushButton {
+    min-width: 80px;
+    min-height: 32px;
+    font-size: 13px;
+}
+
+QSpinBox {
+    background-color: white;
+    border: 2px solid #93c5fd;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #1e40af;
+    font-weight: 600;
+    min-width: 60px;
+    min-height: 28px;
+}
+
+QSpinBox::up-button, QSpinBox::down-button {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #dbeafe,
+        stop:1 #bfdbfe);
+    border: 1px solid #93c5fd;
+    width: 16px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #bfdbfe,
+        stop:1 #93c5fd);
+}
+         </string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <layout class="QHBoxLayout" name="paginationLayout">
+         <property name="spacing">
+          <number>10</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>8</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="totalLabel">
+           <property name="text">
+            <string>总计: 0 条</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="paginationSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="pageSizeLabel">
+           <property name="text">
+            <string>每页显示:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="pageSizeSpinBox">
+           <property name="minimum">
+            <number>5</number>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="singleStep">
+            <number>5</number>
+           </property>
+           <property name="value">
+            <number>10</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="pageLabel">
+           <property name="text">
+            <string>条</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="firstPageButton">
+           <property name="text">
+            <string>⏮ 首页</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="prevPageButton">
+           <property name="text">
+            <string>◀ 上一页</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="pageInfoLabel">
+           <property name="text">
+            <string>第 1 / 1 页</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="nextPageButton">
+           <property name="text">
+            <string>下一页 ▶</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="lastPageButton">
+           <property name="text">
+            <string>末页 ⏭</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

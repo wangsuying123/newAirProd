@@ -1,0 +1,1840 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RealtimeMonitor</class>
+ <widget class="QWidget" name="RealtimeMonitor">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>实时数据监测</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+QWidget {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #f0f9ff, 
+        stop:0.5 #e0f2fe, 
+        stop:1 #f0f9ff);
+    font-family: 'Microsoft YaHei', 'Segoe UI', 'Arial', sans-serif;
+    color: #0f172a;
+}
+QGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #fafbfc);
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    margin-top: 8px;
+    padding: 12px;
+    font-size: 13px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 16px;
+    padding: 0 10px;
+    color: #1e40af;
+    font-weight: bold;
+    font-size: 15px;
+}
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, 
+        stop:1 #2563eb);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-weight: 600;
+    font-size: 13px;
+    min-width: 90px;
+    min-height: 36px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1e40af);
+    transform: translateY(-1px);
+}
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #1e40af, 
+        stop:1 #1e3a8a);
+    transform: translateY(1px);
+}
+QPushButton:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+}
+QLabel {
+    color: #0f172a;
+    font-size: 13px;
+}
+QLineEdit {
+    background-color: #ffffff;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+    selection-background-color: #3b82f6;
+    selection-color: white;
+}
+QLineEdit:focus {
+    border-color: #3b82f6;
+    background-color: #f8fafc;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+QScrollArea {
+    border: none;
+    background-color: transparent;
+}
+QSpinBox {
+    background-color: white;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 6px;
+    font-size: 12px;
+}
+QSpinBox:focus {
+    border-color: #3b82f6;
+}
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+    color: #1e293b;
+    padding: 6px;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    min-height: 30px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 2px 4px;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #60a5fa;
+    color: #ffffff;
+}
+   </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="styleSheet">
+      <string notr="true">
+QScrollArea { 
+    border: none; 
+    background: transparent; 
+}
+QScrollBar:horizontal {
+    border: none;
+    background: #f1f5f9;
+    height: 12px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #94a3b8;
+    border-radius: 6px;
+    min-width: 40px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #64748b;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none;
+    background: none;
+}
+      </string>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAsNeeded</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>783</width>
+        <height>781</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="scrollLayout">
+       <property name="spacing">
+        <number>12</number>
+       </property>
+       <property name="leftMargin">
+        <number>10</number>
+       </property>
+       <property name="topMargin">
+        <number>12</number>
+       </property>
+       <property name="rightMargin">
+        <number>10</number>
+       </property>
+       <property name="bottomMargin">
+        <number>12</number>
+       </property>
+       <item>
+        <widget class="QFrame" name="headerFrame">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">
+QFrame#headerFrame {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #1e3a8a, 
+        stop:0.2 #2563eb,
+        stop:0.5 #3b82f6, 
+        stop:0.8 #60a5fa, 
+        stop:1 #38bdf8);
+    border-radius: 16px;
+    border: 3px solid rgba(255,255,255,0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+          </string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <layout class="QHBoxLayout" name="headerLayout">
+          <property name="spacing">
+           <number>12</number>
+          </property>
+          <property name="leftMargin">
+           <number>16</number>
+          </property>
+          <property name="topMargin">
+           <number>16</number>
+          </property>
+          <property name="rightMargin">
+           <number>16</number>
+          </property>
+          <property name="bottomMargin">
+           <number>16</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="headerIcon">
+            <property name="styleSheet">
+             <string notr="true">font-size: 36px; background: transparent;</string>
+            </property>
+            <property name="text">
+             <string>📊</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QVBoxLayout" name="titleVLayout">
+            <property name="spacing">
+             <number>4</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="titleLabel">
+              <property name="styleSheet">
+               <string notr="true">font-size: 20px; font-weight: bold; color: white; letter-spacing: 3px; background: transparent; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);</string>
+              </property>
+              <property name="text">
+               <string>实时数据监测系统</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="subtitleLabel">
+              <property name="styleSheet">
+               <string notr="true">font-size: 13px; color: rgba(255,255,255,0.85); background: transparent; letter-spacing: 1px;</string>
+              </property>
+              <property name="text">
+               <string>Real-time Data Monitoring System</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <spacer name="headerSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QFrame" name="currentUserFrame">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>50</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QFrame#currentUserFrame {
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="currentUserInnerLayout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
+             <property name="leftMargin">
+              <number>12</number>
+             </property>
+             <property name="topMargin">
+              <number>6</number>
+             </property>
+             <property name="rightMargin">
+              <number>12</number>
+             </property>
+             <property name="bottomMargin">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="userIcon">
+               <property name="minimumSize">
+                <size>
+                 <width>24</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>24</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-size: 18px; background: transparent;</string>
+               </property>
+               <property name="text">
+                <string>👤</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="currentUserLabel">
+               <property name="minimumSize">
+                <size>
+                 <width>60</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-size: 13px; color: white; font-weight: 600; background: transparent;</string>
+               </property>
+               <property name="text">
+                <string>未登录</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="timestampFrame">
+            <property name="minimumSize">
+             <size>
+              <width>140</width>
+              <height>50</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">
+QFrame#timestampFrame {
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="timestampInnerLayout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
+             <property name="leftMargin">
+              <number>12</number>
+             </property>
+             <property name="topMargin">
+              <number>6</number>
+             </property>
+             <property name="rightMargin">
+              <number>12</number>
+             </property>
+             <property name="bottomMargin">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="clockIcon">
+               <property name="minimumSize">
+                <size>
+                 <width>24</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>24</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-size: 18px; background: transparent;</string>
+               </property>
+               <property name="text">
+                <string>🕐</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="timestampLabel">
+               <property name="minimumSize">
+                <size>
+                 <width>80</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">font-size: 12px; color: white; font-weight: 600; font-family: 'Consolas', monospace; background: transparent;</string>
+               </property>
+               <property name="text">
+                <string>--:--:--</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="toolbarFrame">
+         <property name="styleSheet">
+          <string notr="true">
+QFrame#toolbarFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 16px;
+    border: 2px solid #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+          </string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <layout class="QHBoxLayout" name="statusLayout">
+          <property name="spacing">
+           <number>10</number>
+          </property>
+          <property name="leftMargin">
+           <number>12</number>
+          </property>
+          <property name="topMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>12</number>
+          </property>
+          <property name="bottomMargin">
+           <number>10</number>
+          </property>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="airConnectionStatusLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #dc2626; background-color: #fef2f2; padding: 10px 16px; border-radius: 18px; font-size: 13px; border: 2px solid #fecaca;</string>
+            </property>
+            <property name="text">
+             <string>🔴 气密仪: 未连接</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="plcConnectionStatusLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #dc2626; background-color: #fef2f2; padding: 10px 16px; border-radius: 18px; font-size: 13px; border: 2px solid #fecaca;</string>
+            </property>
+            <property name="text">
+             <string>🔴 主控板: 未连接</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="pressureConnectionStatusLabel">
+            <property name="styleSheet">
+             <string notr="true">font-weight: 600; color: #dc2626; background-color: #fef2f2; padding: 10px 16px; border-radius: 18px; font-size: 13px; border: 2px solid #fecaca;</string>
+            </property>
+            <property name="text">
+             <string>🔴 调压装置: 未连接</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="dataDisplayGroupBox">
+         <property name="styleSheet">
+          <string notr="true">
+QGroupBox#dataDisplayGroupBox {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ffffff, 
+        stop:1 #f8fafc);
+    border-radius: 12px;
+    border: 2px solid #cbd5e1;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+QGroupBox#dataDisplayGroupBox::title {
+    font-size: 15px;
+    color: #1e40af;
+    font-weight: bold;
+}
+          </string>
+         </property>
+         <property name="title">
+          <string>📈 实时参数监测</string>
+         </property>
+         <layout class="QGridLayout" name="dataGridLayout">
+          <property name="horizontalSpacing">
+           <number>8</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>6</number>
+          </property>
+          <item row="0" column="0" colspan="2">
+           <widget class="QFrame" name="airtightParamsFrame">
+            <property name="styleSheet">
+             <string notr="true">
+QFrame#airtightParamsFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #f0f9ff, 
+        stop:1 #e0f2fe);
+    border: 2px solid #bae6fd;
+    border-radius: 12px;
+    padding: 10px;
+}
+             </string>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
+            </property>
+            <layout class="QGridLayout" name="airtightParamsGridLayout">
+             <property name="horizontalSpacing">
+              <number>16</number>
+             </property>
+             <property name="verticalSpacing">
+              <number>10</number>
+             </property>
+             <item row="0" column="0">
+              <layout class="QHBoxLayout" name="fillTimeCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="testProgramNumberTitleLabelTop">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 17px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>🔢 当前程序号</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="testProgramNumberValueLabel">
+                 <property name="styleSheet">
+                  <string notr="true">font-size: 22px; font-weight: bold; color: #2563eb; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="0" column="1">
+              <layout class="QHBoxLayout" name="stabilizeTimeCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="stabilizeTimeTitleLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>⏱ 稳定时间:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="stabilizeTimeValueLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">color: #2563eb; font-size: 16px; font-weight: 600; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="0" column="2">
+              <layout class="QHBoxLayout" name="testTimeCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="testTimeTitleLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>⏱ 测试时间:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="testTimeValueLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">color: #2563eb; font-size: 16px; font-weight: 600; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="0">
+              <layout class="QHBoxLayout" name="dumpTimeCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="dumpTimeTitleLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>💨 排气时间:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="dumpTimeValueLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">color: #2563eb; font-size: 16px; font-weight: 600; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="1">
+              <layout class="QHBoxLayout" name="fillPressureCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="fillPressureTitleLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>🎯 填充压力:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="fillPressureValueLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">color: #2563eb; font-size: 16px; font-weight: 600; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="2">
+              <layout class="QHBoxLayout" name="volumeCellLayoutAirtight">
+               <item>
+                <widget class="QLabel" name="fillTimeTitleLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>⏱ 填充时间:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="fillTimeValueLabelAirtight">
+                 <property name="styleSheet">
+                  <string notr="true">color: #2563eb; font-size: 16px; font-weight: 600; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>--</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="2">
+              <layout class="QHBoxLayout" name="fillPressureUnitCellLayoutAirtight">
+               <item>
+                <layout class="QVBoxLayout" name="programNumberLayout"/>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="productNumberLayout">
+            <property name="spacing">
+             <number>10</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="productNumberTitleLabel">
+              <property name="styleSheet">
+               <string notr="true">font-weight: bold; color: #475569; font-size: 18px;</string>
+              </property>
+              <property name="text">
+               <string>📦 产品编号:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="productNumberLineEdit">
+              <property name="minimumSize">
+               <size>
+                <width>250</width>
+                <height>40</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QLineEdit {
+    color: #1e40af;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 10px 16px;
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+    background: #ffffff;
+}
+QLineEdit:focus {
+    border-color: #3b82f6;
+    background: #f8fafc;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+               </string>
+              </property>
+              <property name="placeholderText">
+               <string>请输入或扫描产品编号</string>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="currentProductNumberLabel">
+              <property name="minimumSize">
+               <size>
+                <width>300</width>
+                <height>40</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">font-size: 16px; font-weight: bold; color: #16a34a; background: #f0fdf4; border: 2px solid #86efac; border-radius: 10px; padding: 6px 14px;</string>
+              </property>
+              <property name="text">
+               <string></string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="clearProductNumberButton">
+              <property name="minimumSize">
+               <size>
+                <width>90</width>
+                <height>40</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QPushButton {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 10px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ef4444, stop:1 #dc2626);
+    border: none;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f87171, stop:1 #ef4444);
+}
+QPushButton:pressed {
+    background: #b91c1c;
+}
+               </string>
+              </property>
+              <property name="text">
+               <string>🗑 清空编号</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="productSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>10</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="okNgLayout">
+            <property name="spacing">
+             <number>10</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="okCountLabel">
+              <property name="minimumSize">
+               <size>
+                <width>180</width>
+                <height>50</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QLabel {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #10b981, stop:1 #059669);
+    border: 2px solid #047857;
+}
+               </string>
+              </property>
+              <property name="text">
+               <string>✅ OK: 0</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="ngCountLabel">
+              <property name="minimumSize">
+               <size>
+                <width>180</width>
+                <height>50</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QLabel {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #ef4444, stop:1 #dc2626);
+    border: 2px solid #b91c1c;
+}
+               </string>
+              </property>
+              <property name="text">
+               <string>❌ NG: 0</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="passRateLabel">
+              <property name="minimumSize">
+               <size>
+                <width>200</width>
+                <height>50</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QLabel {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3b82f6, stop:1 #2563eb);
+    border: 2px solid #1e40af;
+}
+               </string>
+              </property>
+              <property name="text">
+               <string>📊 合格率: 0.0%</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="scanBarcodeCheckBox">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>50</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QCheckBox {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e40af;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid #93c5fd;
+    background: #ffffff;
+}
+QCheckBox::indicator:checked {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3b82f6, stop:1 #2563eb);
+    border-color: #1e40af;
+    image: url(:/icons/check.png);
+}
+QCheckBox::indicator:hover {
+    border-color: #3b82f6;
+}
+               </string>
+              </property>
+              <property name="text">
+               <string>是否扫码</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="okNgSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="mainDataRowLayout">
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <item>
+             <widget class="QFrame" name="programPressurePanel">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>180</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QFrame#programPressurePanel {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #dbeafe, 
+        stop:1 #bfdbfe);
+    border: 3px solid #60a5fa;
+    border-radius: 16px;
+    padding: 12px;
+}
+               </string>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <layout class="QVBoxLayout" name="programPressurePanelLayout">
+               <property name="spacing">
+                <number>10</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="realtimeDataTitle">
+                 <property name="styleSheet">
+                  <string notr="true">font-size: 18px; font-weight: bold; color: #1e40af; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>📊 实时数据</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="pressureRowLayout">
+                 <item>
+                  <widget class="QLabel" name="pressureTitleInline">
+                   <property name="styleSheet">
+                    <string notr="true">font-weight: bold; color: #475569; font-size: 20px; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>压力</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="pressureValueLabel">
+                   <property name="styleSheet">
+                    <string notr="true">font-size: 28px; font-weight: bold; color: #1d4ed8; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>--.-</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="pressureUnitLabel">
+                   <property name="styleSheet">
+                    <string notr="true">font-weight: 600; color: #64748b; font-size: 16px; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>--</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="leakRowLayout">
+                 <item>
+                  <widget class="QLabel" name="leakTitleInline">
+                   <property name="styleSheet">
+                    <string notr="true">font-weight: bold; color: #475569; font-size: 20px; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>泄漏</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="leakValueLabel">
+                   <property name="styleSheet">
+                    <string notr="true">font-size: 28px; font-weight: bold; color: #1d4ed8; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>0.00</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="leakUnitLabel">
+                   <property name="styleSheet">
+                    <string notr="true">font-weight: 600; color: #64748b; font-size: 16px; background: transparent;</string>
+                   </property>
+                   <property name="text">
+                    <string>--</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QFrame" name="testProcessPanel">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>180</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QFrame#testProcessPanel {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #fef3c7, 
+        stop:1 #fde047);
+    border: 3px solid #fbbf24;
+    border-radius: 16px;
+    padding: 12px;
+}
+               </string>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <layout class="QVBoxLayout" name="testProcessPanelLayout">
+               <property name="spacing">
+                <number>8</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="testProcessTitleLabel">
+                 <property name="styleSheet">
+                  <string notr="true">font-size: 18px; font-weight: bold; color: #854d0e; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>⚙️ 当前测试进程</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="currentProcessFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>55</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#currentProcessFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2563eb, 
+        stop:1 #1e40af);
+    border: 2px solid #1e3a8a;
+    border-radius: 14px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="currentProcessLayout">
+                  <item>
+                   <widget class="QLabel" name="currentProcessLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: white; font-size: 24px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>待机</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="progressBarTitleLabel">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #854d0e; font-size: 16px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>📊 测试进度</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QProgressBar" name="testProgressBar">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>32</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QProgressBar {
+    border: 2px solid #cbd5e1;
+    border-radius: 14px;
+    background-color: #e2e8f0;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: #1e293b;
+}
+QProgressBar::chunk {
+    border-radius: 12px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #3b82f6, 
+        stop:0.5 #60a5fa,
+        stop:1 #3b82f6);
+}
+                  </string>
+                 </property>
+                 <property name="value">
+                  <number>0</number>
+                 </property>
+                 <property name="format">
+                  <string>%p%</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QFrame" name="testResultPanel">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>200</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">
+QFrame#testResultPanel {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #f8fafc, 
+        stop:1 #e2e8f0);
+    border: 3px solid #94a3b8;
+    border-radius: 16px;
+    padding: 12px;
+}
+               </string>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <layout class="QVBoxLayout" name="testResultPanelLayout">
+               <property name="spacing">
+                <number>8</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="testResultTitleLabel">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 18px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>🎯 当前测试结果</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="testResultFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>45</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#testResultFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f8fafc, stop:1 #f1f5f9);
+    border: 2px solid #cbd5e1;
+    border-radius: 12px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="testResultFrameLayout">
+                  <item>
+                   <widget class="QLabel" name="testResultValueLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: #64748b; font-size: 24px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>--</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="summaryLabel">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 18px; background: transparent;</string>
+                 </property>
+                 <property name="text">
+                  <string>📋 汇总结果</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="summaryResultFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>50</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#summaryResultFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #faf5ff, stop:1 #f3e8ff);
+    border: 2px solid #d8b4fe;
+    border-radius: 8px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="summaryValueLayout">
+                  <item>
+                   <widget class="QLabel" name="summaryResultValueLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: #7c3aed; font-size: 22px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>--</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="4" column="0" colspan="2">
+           <widget class="QFrame" name="channelsResultFrame">
+            <property name="styleSheet">
+             <string notr="true">
+QFrame#channelsResultFrame {
+    background: transparent;
+    border: none;
+}
+             </string>
+            </property>
+            <layout class="QHBoxLayout" name="channelsHLayout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
+             <item>
+              <layout class="QVBoxLayout" name="test1Layout">
+               <item>
+                <widget class="QLabel" name="test1Label">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 20px;</string>
+                 </property>
+                 <property name="text">
+                  <string>🔵 通道1</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="test1ResultFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>110</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#test1ResultFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #eff6ff, 
+        stop:1 #dbeafe);
+    border: 2px solid #60a5fa;
+    border-radius: 12px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="test1ValueLayout">
+                  <property name="spacing">
+                   <number>4</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>6</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="test1ResultValueLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: #1e40af; font-size: 24px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>--</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test1PassPressureLayout">
+                    <item>
+                     <widget class="QLabel" name="test1PassPressureTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #1e40af; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>压力:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel1PassPressureLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #2563eb; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test1PassLeakLayout">
+                    <item>
+                     <widget class="QLabel" name="test1PassLeakTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #1e40af; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>泄漏:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel1PassLeakLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #2563eb; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="test2Layout">
+               <item>
+                <widget class="QLabel" name="test2Label">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 20px;</string>
+                 </property>
+                 <property name="text">
+                  <string>🟢 通道2</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="test2ResultFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>110</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#test2ResultFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #f0fdf4, 
+        stop:1 #dcfce7);
+    border: 2px solid #4ade80;
+    border-radius: 12px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="test2ValueLayout">
+                  <property name="spacing">
+                   <number>4</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>6</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="test2ResultValueLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: #166534; font-size: 24px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>--</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test2PassPressureLayout">
+                    <item>
+                     <widget class="QLabel" name="test2PassPressureTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #166534; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>压力:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel2PassPressureLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #16a34a; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test2PassLeakLayout">
+                    <item>
+                     <widget class="QLabel" name="test2PassLeakTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #166534; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>泄漏:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel2PassLeakLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #16a34a; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="test3Layout">
+               <item>
+                <widget class="QLabel" name="test3Label">
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #475569; font-size: 20px;</string>
+                 </property>
+                 <property name="text">
+                  <string>🟠 通道3</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="test3ResultFrame">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>110</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">
+QFrame#test3ResultFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #fff7ed, 
+        stop:1 #ffedd5);
+    border: 2px solid #fb923c;
+    border-radius: 12px;
+}
+                  </string>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="test3ValueLayout">
+                  <property name="spacing">
+                   <number>4</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>6</number>
+                  </property>
+                  <item>
+                   <widget class="QLabel" name="test3ResultValueLabel">
+                    <property name="styleSheet">
+                     <string notr="true">font-weight: bold; color: #c2410c; font-size: 24px; background: transparent;</string>
+                    </property>
+                    <property name="text">
+                     <string>--</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test3PassPressureLayout">
+                    <item>
+                     <widget class="QLabel" name="test3PassPressureTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #c2410c; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>压力:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel3PassPressureLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #ea580c; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="test3PassLeakLayout">
+                    <item>
+                     <widget class="QLabel" name="test3PassLeakTitle">
+                      <property name="styleSheet">
+                       <string notr="true">font-weight: bold; color: #c2410c; font-size: 16px; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>泄漏:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLabel" name="channel3PassLeakLabel">
+                      <property name="styleSheet">
+                       <string notr="true">color: #ea580c; font-size: 26px; font-weight: 600; background: transparent;</string>
+                      </property>
+                      <property name="text">
+                       <string>--</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="controlGroupBox">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <property name="title">
+          <string>控制选项</string>
+         </property>
+         <layout class="QGridLayout" name="controlGridLayout">
+          <property name="horizontalSpacing">
+           <number>15</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <layout class="QHBoxLayout" name="refreshRateLayout">
+            <property name="spacing">
+             <number>5</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="refreshRateLabel">
+              <property name="text">
+               <string>刷新间隔:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="refreshRateSpinBox">
+              <property name="minimum">
+               <number>100</number>
+              </property>
+              <property name="maximum">
+               <number>10000</number>
+              </property>
+              <property name="value">
+               <number>500</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="refreshRateUnitLabel">
+              <property name="text">
+               <string>ms</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="bottomSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
