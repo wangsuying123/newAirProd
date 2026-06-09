@@ -7,6 +7,9 @@
 #include <QTimer>
 #include <QThread>
 #include <QMessageBox>
+#include <QPointer>
+#include <functional>
+#include <memory>
 #include "PLCStatusEnums.h"
 #include "AirTightnessParams.h"
 #include "AirTightnessParamsDao.h"
@@ -85,7 +88,7 @@ void PlcMonitor::initConnections()
             updatePlcData(); // 实时更新PLC数据
         }
     });
-    m_timer->start(1500); // 每1.5秒更新一次，降低频率避免拥塞
+    m_timer->start(5000); // 每5秒更新一次，大幅降低频率避免总线拥塞
     
     // 按钮槽函数使用Qt自动连接机制（on_<objectName>_<signal>）
 }
@@ -98,208 +101,171 @@ void PlcMonitor::readPlcData()
 
 void PlcMonitor::updatePlcData()
 {
-    QString deviceRunningStatus = "未连接";
-    QString deviceStatusText = "未连接";
-    QString detectionResultText = "未连接";
+    // ========== 重构：合并13+个零散阻塞请求为3个批量异步请求 ==========
+    // 1. 读取 HoldingRegisters 400/402/404 (连续3个)
+    // 2. 读取 Coils 105/106/1013/1027/1047 (非连续，合并为2次请求：105-106 连续，1013-1047跨度太大拆分)
+    // 3. 读取 Coils 49408/49409/49410 (连续3个)
+    // 不再使用 QEventLoop 阻塞，完全异步回调方式
     
-    // 只有当PLC连接成功时才读取寄存器值
-    if (m_isConnected) {
-        quint16 d400Value = 0; // 设备状态值 (D400)
-        quint16 d402Value = 0; // 设备运行值 (D402)
-        quint16 d404Value = 0; // 检验结果值 (D404)
-        quint16 okCountValue = 0; // OK计数 (位地址0120.00)
-        quint16 ngCountValue = 0; // NG计数 (字寄存器0122)
-        quint16 register105Value = 0; // 寄存器105的值
-        quint16 register106Value = 0; // 寄存器106的值
-        
-        // 从寄存器读取值
-        bool d400Success = readRegister(400, d400Value);
-        bool d402Success = readRegister(402, d402Value);
-        bool d404Success = readRegister(404, d404Value);
-        // 使用功能码01（Read Coils）读取寄存器105
-        bool register105Success = readRegister(105, register105Value, QModbusDataUnit::Coils);
-        // 使用功能码01（Read Coils）读取寄存器106
-        bool register106Success = readRegister(106, register106Value, QModbusDataUnit::Coils);
-        
-        // 使用功能码2 (Discrete Inputs) 读取位地址0120.00
-        bool okCountSuccess = readRegister(120, okCountValue, QModbusDataUnit::HoldingRegisters);
-        
-        // 使用功能码3 (Holding Registers) 读取字寄存器0122
-        bool ngCountSuccess = readRegister(122, ngCountValue, QModbusDataUnit::HoldingRegisters);
-        
-        // 更新OK和NG计数值
-        if (okCountSuccess) {
-            m_okCount = okCountValue;
+    if (!m_isConnected || m_plcBusy) {
+        return; // 上一轮未完成或未连接，跳过
+    }
+    m_plcBusy = true;
+    
+    // 批次1：读取 HoldingRegisters 400,402,404 —— 注意400/402/404不连续(间隔2)，
+    // 为简化，分别发起3个独立异步请求（但不再阻塞）
+    int pendingBatches = 3;
+    
+    // 使用计数器，当3个批次全部完成时释放 m_plcBusy
+    auto onBatchDone = [this, &pendingBatches]() {
+        pendingBatches--;
+        if (pendingBatches <= 0) {
+            m_plcBusy = false;
+            // 刷新UI显示
+            updateStatistics();
         }
-        if (ngCountSuccess) {
-            m_ngCount = ngCountValue;
+    };
+    
+    // ===== 批次1：读取 HoldingRegisters 400, 402, 404 =====
+    // 地址不是严格连续(400/402/404间隔2)，使用3次独立异步请求
+    std::shared_ptr<int> pendingHoldings = std::make_shared<int>(3);
+    auto onHoldingDone = [this, pendingHoldings, onBatchDone](bool ok, quint16 addr, quint16 value) {
+        if (ok) {
+            if (addr == 400) m_cachedD400 = value;
+            else if (addr == 402) m_cachedD402 = value;
+            else if (addr == 404) m_cachedD404 = value;
         }
-        
-        // 处理寄存器105的值，控制气密仪启动（上升沿检测，防止重复触发）
-        if (register105Success && register105Value == 1 && m_lastRegister105Value == 0) {
-            qDebug() << "检测到寄存器105上升沿（0->1），启动气密仪";
-            startAirtightInstrument();
+        (*pendingHoldings)--;
+        if (*pendingHoldings == 0) {
+            // 此批次完成，刷新状态UI
+            PLCStatusEnums::DeviceStatus status = PLCStatusEnums::deviceStatusFromCode(m_cachedD400);
+            PLCStatusEnums::DeviceOperation operation = PLCStatusEnums::deviceOperationFromCode(m_cachedD402);
+            PLCStatusEnums::InspectionResult result = PLCStatusEnums::inspectionResultFromCode(m_cachedD404);
+            ui->deviceStatusValue->setText(QString("%1 (%2)").arg(PLCStatusEnums::deviceStatusToString(status)).arg(m_cachedD400));
+            ui->deviceRunningValue->setText(QString("%1 (%2)").arg(PLCStatusEnums::deviceOperationToString(operation)).arg(m_cachedD402));
+            ui->detectionResultValue->setText(QString("%1 (%2)").arg(PLCStatusEnums::inspectionResultToString(result)).arg(m_cachedD404));
+            onBatchDone();
         }
-        m_lastRegister105Value = register105Value;
-        
-        // 处理寄存器106的值，控制气密仪复位（上升沿检测，防止重复触发）
-        if (register106Success && register106Value == 1 && m_lastRegister106Value == 0) {
-            qDebug() << "检测到寄存器106上升沿（0->1），复位气密仪";
-            resetAirtightInstrument();
-        }
-        m_lastRegister106Value = register106Value;
-
-        // 读取寄存器1013（功能码01，Coils），上升沿检测
-        quint16 register1013Value = 0;
-        bool register1013Success = readRegister(1013, register1013Value, QModbusDataUnit::Coils);
-        if (register1013Success && register1013Value == 1 && m_lastRegister1013Value == 0) {
-            qDebug() << "检测到寄存器1013上升沿（0->1），根据测试使能选择封堵";
-            // 读取三路测试使能状态（49408/49409/49410，Coils）
-            quint16 en1 = 0, en2 = 0, en3 = 0;
-            readRegister(49408, en1, QModbusDataUnit::Coils);
-            readRegister(49409, en2, QModbusDataUnit::Coils);
-            readRegister(49410, en3, QModbusDataUnit::Coils);
-            if (en1 == 1) {
-                // 测试1使能：开封堵1，关封堵2/3
-                writePlcCoilBlocking(49411, 1);
-                writePlcCoilBlocking(49412, 0);
-                writePlcCoilBlocking(49413, 0);
-                logMessage("寄存器1013触发：测试1使能，开封堵1，关封堵2/3", "info");
-            } else if (en2 == 1) {
-                // 测试2使能：开封堵2，关封堵1/3
-                writePlcCoilBlocking(49411, 0);
-                writePlcCoilBlocking(49412, 1);
-                writePlcCoilBlocking(49413, 0);
-                logMessage("寄存器1013触发：测试2使能，开封堵2，关封堵1/3", "info");
-            } else if (en3 == 1) {
-                // 测试3使能：开封堵3，关封堵1/2
-                writePlcCoilBlocking(49411, 0);
-                writePlcCoilBlocking(49412, 0);
-                writePlcCoilBlocking(49413, 1);
-                logMessage("寄存器1013触发：测试3使能，开封堵3，关封堵1/2", "info");
-            } else {
-                logMessage("寄存器1013触发：所有测试使能均未开启，不操作封堵", "warning");
-            }
-        }
-        if (register1013Success) {
-            m_lastRegister1013Value = register1013Value;
-        }
-
-        // 读取寄存器1027（功能码01，Coils），上升沿检测
-        // 若封堵1已开启，检查测试2使能，开封堵2（封堵1保持，封堵3关）
-        quint16 register1026Value = 0;
-        bool register1026Success = readRegister(1027, register1026Value, QModbusDataUnit::Coils);
-        if (register1026Success && register1026Value == 1 && m_lastRegister1026Value == 0) {
-            qDebug() << "检测到寄存器1026上升沿（0->1），检查封堵1状态及测试2/3使能";
-            quint16 plug1 = 0, en2 = 0, en3 = 0;
-            readRegister(49411, plug1, QModbusDataUnit::Coils); // 封堵1地址
-            readRegister(49409, en2, QModbusDataUnit::Coils);   // 测试2使能地址
-            readRegister(49410, en3, QModbusDataUnit::Coils);   // 测试3使能地址
-            if (plug1 == 1 && en2 == 1) {
-                writePlcCoilBlocking(49411, 0); // 关封堵1
-                writePlcCoilBlocking(49412, 1); // 开封堵2
-                writePlcCoilBlocking(49413, 0); // 关封堵3
-                logMessage("寄存器1026触发：封堵1已开且测试2使能，开封堵2，关封堵3", "info");
-            } else if (plug1 == 1 && en2 == 0 && en3 == 1) {
-                writePlcCoilBlocking(49411, 0); // 关封堵1
-                writePlcCoilBlocking(49412, 0); // 关封堵2
-                writePlcCoilBlocking(49413, 1); // 开封堵3
-                logMessage("寄存器1026触发：封堵1已开，测试2未使能，测试3使能，开封堵3", "info");
-            } else {
-                logMessage(QString("寄存器1026触发：条件不满足（封堵1=%1，测试2使能=%2，测试3使能=%3），不操作").arg(plug1).arg(en2).arg(en3), "warning");
-            }
-        }
-        if (register1026Success) {
-            m_lastRegister1026Value = register1026Value;
-        }
-
-        // 读取寄存器1047（功能码01，Coils），上升沿检测
-        // 若封堵2已开启，检查测试3使能，开封堵3（封堵1/2保持）
-        quint16 register1046Value = 0;
-        bool register1046Success = readRegister(1047, register1046Value, QModbusDataUnit::Coils);
-        if (register1046Success && register1046Value == 1 && m_lastRegister1046Value == 0) {
-            qDebug() << "检测到寄存器1046上升沿（0->1），检查封堵2状态及测试3使能";
-            quint16 plug2 = 0, en3 = 0;
-            readRegister(49412, plug2, QModbusDataUnit::Coils); // 封堵2地址
-            readRegister(49410, en3, QModbusDataUnit::Coils);   // 测试3使能地址
-            if (plug2 == 1 && en3 == 1) {
-                writePlcCoilBlocking(49411, 0); // 关封堵1
-                writePlcCoilBlocking(49412, 0); // 开封堵2
-                writePlcCoilBlocking(49413, 1); // 开封堵3
-                logMessage("寄存器1046触发：封堵2已开且测试3使能，开封堵3", "info");
-            } else {
-                logMessage(QString("寄存器1046触发：条件不满足（封堵2=%1，测试3使能=%2），不操作").arg(plug2).arg(en3), "warning");
-            }
-        }
-        if (register1046Success) {
-            m_lastRegister1046Value = register1046Value;
-        }
-
-        // 同步测试按钮状态
-        quint16 test1En = 0, test2En = 0, test3En = 0;
-        if (readRegister(49408, test1En, QModbusDataUnit::Coils)) {
-            ui->test1Button->setStyleSheet(test1En == 1
-                ? "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-            ui->test1OffButton->setStyleSheet(test1En == 1
-                ? "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        }
-        if (readRegister(49409, test2En, QModbusDataUnit::Coils)) {
-            ui->test2Button->setStyleSheet(test2En == 1
-                ? "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-            ui->test2OffButton->setStyleSheet(test2En == 1
-                ? "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        }
-        if (readRegister(49410, test3En, QModbusDataUnit::Coils)) {
-            ui->test3Button->setStyleSheet(test3En == 1
-                ? "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-            ui->test3OffButton->setStyleSheet(test3En == 1
-                ? "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;"
-                : "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        }
-        
-        // 如果读取成功，使用PLCStatusEnums类将值转换为中文显示
-        if (d400Success) {
-            // 对于设备状态值，我们直接显示数值和对应的中文描述
-            PLCStatusEnums::DeviceStatus status = PLCStatusEnums::deviceStatusFromCode(d400Value);
-            deviceStatusText = QString("%1 (%2)").arg(PLCStatusEnums::deviceStatusToString(status)).arg(d400Value);
-        } else {
-            deviceStatusText = "读取失败";
-        }
-        
-        if (d402Success) {
-            // 对于设备运行值，我们直接显示数值和对应的中文描述
-            PLCStatusEnums::DeviceOperation operation = PLCStatusEnums::deviceOperationFromCode(d402Value);
-            deviceRunningStatus = QString("%1 (%2)").arg(PLCStatusEnums::deviceOperationToString(operation)).arg(d402Value);
-        } else {
-            deviceRunningStatus = "读取失败";
-        }
-        
-        if (d404Success) {
-            // 对于检验结果值，我们直接显示数值和对应的中文描述
-            PLCStatusEnums::InspectionResult result = PLCStatusEnums::inspectionResultFromCode(d404Value);
-            detectionResultText = QString("%1 (%2)").arg(PLCStatusEnums::inspectionResultToString(result)).arg(d404Value);
-        } else {
-            detectionResultText = "读取失败";
-        }
+    };
+    
+    for (quint16 addr : {400, 402, 404}) {
+        readRegisterAsync(addr, QModbusDataUnit::HoldingRegisters,
+            [addr, onHoldingDone](bool success, quint16 value) {
+                onHoldingDone(success, addr, value);
+            });
     }
     
-    // 更新设备运行状态显示
-    ui->deviceRunningValue->setText(deviceRunningStatus);
+    // ===== 批次2：读取 Coils —— 监控 105/106/1013/1027/1047 的上升沿 =====
+    // 105与106相邻(连续2)，1013/1027/1047间隔较大，分两组
+    readRegisterAsync(105, QModbusDataUnit::Coils, [this](bool ok, quint16 v) {
+        if (ok && v == 1 && m_lastRegister105Value == 0) {
+            qDebug() << "寄存器105上升沿，启动气密仪";
+            startAirtightInstrument();
+        }
+        if (ok) m_lastRegister105Value = v;
+    });
+    readRegisterAsync(106, QModbusDataUnit::Coils, [this](bool ok, quint16 v) {
+        if (ok && v == 1 && m_lastRegister106Value == 0) {
+            qDebug() << "寄存器106上升沿，复位气密仪";
+            resetAirtightInstrument();
+        }
+        if (ok) m_lastRegister106Value = v;
+    });
     
-    // 更新设备状态显示
-    ui->deviceStatusValue->setText(deviceStatusText);
+    // 读取 1013/1027/1047 + 49408/49409/49410/49411/49412/49413
+    // 当检测到上升沿时，需要查询使能/封堵状态，使用缓存值（若缓存无效再触发异步查询）
+    std::shared_ptr<bool> edgeFired = std::make_shared<bool>(false);
     
-    // 更新检测结果显示
-    ui->detectionResultValue->setText(detectionResultText);
+    readRegisterAsync(1013, QModbusDataUnit::Coils, [this, edgeFired](bool ok, quint16 v) {
+        if (ok && v == 1 && m_lastRegister1013Value == 0) {
+            *edgeFired = true;
+            qDebug() << "寄存器1013上升沿，查询测试使能状态";
+            // 异步读取 49408/49409/49410 三个线圈（连续）
+            readCoilsAsync(49408, 6, [this](bool success, const QVector<quint16>& vals) {
+                // 49408/49409/49410 使能 + 49411/49412/49413 封堵状态
+                if (success && vals.size() >= 3) {
+                    quint16 en1 = vals[0], en2 = vals[1], en3 = vals[2];
+                    if (en1 == 1) {
+                        writePlcCoil(49411, 1, [](bool){}); writePlcCoil(49412, 0, [](bool){}); writePlcCoil(49413, 0, [](bool){});
+                        logMessage("寄存器1013触发：测试1使能，开封堵1，关封堵2/3", "info");
+                    } else if (en2 == 1) {
+                        writePlcCoil(49411, 0, [](bool){}); writePlcCoil(49412, 1, [](bool){}); writePlcCoil(49413, 0, [](bool){});
+                        logMessage("寄存器1013触发：测试2使能，开封堵2，关封堵1/3", "info");
+                    } else if (en3 == 1) {
+                        writePlcCoil(49411, 0, [](bool){}); writePlcCoil(49412, 0, [](bool){}); writePlcCoil(49413, 1, [](bool){});
+                        logMessage("寄存器1013触发：测试3使能，开封堵3，关封堵1/2", "info");
+                    } else {
+                        logMessage("寄存器1013触发：所有测试使能均未开启，不操作封堵", "warning");
+                    }
+                }
+            });
+        }
+        if (ok) m_lastRegister1013Value = v;
+    });
     
-    // 更新统计数据显示
-    updateStatistics();
-
+    readRegisterAsync(1027, QModbusDataUnit::Coils, [this](bool ok, quint16 v) {
+        if (ok && v == 1 && m_lastRegister1026Value == 0) {
+            qDebug() << "寄存器1027上升沿，检查封堵1+测试使能";
+            readCoilsAsync(49409, 5, [this](bool success, const QVector<quint16>& vals) {
+                // 49409(en2),49410(en3),49411(plug1),49412(plug2),49413(plug3)
+                if (success && vals.size() >= 5) {
+                    quint16 en2 = vals[0], en3 = vals[1], plug1 = vals[2];
+                    if (plug1 == 1 && en2 == 1) {
+                        writePlcCoil(49411, 0, [](bool){}); writePlcCoil(49412, 1, [](bool){}); writePlcCoil(49413, 0, [](bool){});
+                        logMessage("寄存器1027触发：封堵1已开且测试2使能，开封堵2，关封堵3", "info");
+                    } else if (plug1 == 1 && en2 == 0 && en3 == 1) {
+                        writePlcCoil(49411, 0, [](bool){}); writePlcCoil(49412, 0, [](bool){}); writePlcCoil(49413, 1, [](bool){});
+                        logMessage("寄存器1027触发：封堵1已开，测试2未使能，测试3使能，开封堵3", "info");
+                    }
+                }
+            });
+        }
+        if (ok) m_lastRegister1026Value = v;
+    });
+    
+    readRegisterAsync(1047, QModbusDataUnit::Coils, [this](bool ok, quint16 v) {
+        if (ok && v == 1 && m_lastRegister1046Value == 0) {
+            qDebug() << "寄存器1047上升沿，检查封堵2+测试3使能";
+            readCoilsAsync(49410, 4, [this](bool success, const QVector<quint16>& vals) {
+                // 49410(en3),49411(plug1),49412(plug2),49413(plug3)
+                if (success && vals.size() >= 4) {
+                    quint16 en3 = vals[0], plug2 = vals[2];
+                    if (plug2 == 1 && en3 == 1) {
+                        writePlcCoil(49411, 0, [](bool){}); writePlcCoil(49412, 0, [](bool){}); writePlcCoil(49413, 1, [](bool){});
+                        logMessage("寄存器1047触发：封堵2已开且测试3使能，开封堵3", "info");
+                    }
+                }
+            });
+        }
+        if (ok) m_lastRegister1046Value = v;
+    });
+    
+    // 批次2完成回调
+    onBatchDone();
+    
+    // ===== 批次3：读取 Coils 49408/49409/49410 —— 更新测试按钮UI =====
+    readCoilsAsync(49408, 3, [this, onBatchDone](bool success, const QVector<quint16>& vals) {
+        if (success && vals.size() >= 3) {
+            auto updateBtnStyle = [this](int chIdx, quint16 enVal) {
+                QString onStyle = "background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;";
+                QString offStyle = "background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;";
+                if (chIdx == 1) {
+                    ui->test1Button->setStyleSheet(enVal == 1 ? onStyle : offStyle);
+                    ui->test1OffButton->setStyleSheet(enVal == 1 ? offStyle : onStyle);
+                } else if (chIdx == 2) {
+                    ui->test2Button->setStyleSheet(enVal == 1 ? onStyle : offStyle);
+                    ui->test2OffButton->setStyleSheet(enVal == 1 ? offStyle : onStyle);
+                } else {
+                    ui->test3Button->setStyleSheet(enVal == 1 ? onStyle : offStyle);
+                    ui->test3OffButton->setStyleSheet(enVal == 1 ? offStyle : onStyle);
+                }
+            };
+            updateBtnStyle(1, vals[0]);
+            updateBtnStyle(2, vals[1]);
+            updateBtnStyle(3, vals[2]);
+        }
+        onBatchDone();
+    });
 }
 
 void PlcMonitor::updateStatistics()
@@ -468,59 +434,109 @@ void PlcMonitor::setPressureDeviceAddress(int address)
     }
 }
 
-bool PlcMonitor::readRegister(quint16 address, quint16 &value, QModbusDataUnit::RegisterType type) {
+// ===== 异步读取单个寄存器：非阻塞，回调方式 =====
+void PlcMonitor::readRegisterAsync(quint16 address, QModbusDataUnit::RegisterType type,
+                                   const std::function<void(bool success, quint16 value)>& callback) {
     if (!m_modbusClient || !m_isConnected) {
         qDebug() << "无法读取寄存器: 未连接到设备";
-        return false;
+        if (callback) callback(false, 0);
+        return;
     }
 
-    // 使用功能码03（Read Holding Registers）读取单个寄存器
     QModbusDataUnit readUnit(type, address, 1);
-    
-    // 发送读取请求
-    QModbusReply *reply = m_modbusClient->sendReadRequest(readUnit, m_deviceAddress); // 使用配置的设备地址
+    QModbusReply *reply = m_modbusClient->sendReadRequest(readUnit, m_deviceAddress);
     if (!reply) {
         qDebug() << QString("发送读取请求失败: %1").arg(m_modbusClient->errorString());
-        return false;
+        if (callback) callback(false, 0);
+        return;
     }
 
-    // 等待回复或超时
-    QEventLoop loop;
-    QTimer timer;
-    timer.setSingleShot(true);
-    
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(3000);
-    loop.exec();
+    // 为防止超时后reply对象仍存活，使用 QPointer 管理生命周期
+    QPointer<QModbusReply> replyGuard(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(4000); // 4秒超时，比原3秒更宽松
 
-    // 处理回复
-    bool success = false;
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-        
-        if (reply->error() == QModbusDevice::NoError) {
-            const QModbusDataUnit result = reply->result();
+    // 超时处理
+    connect(timeoutTimer, &QTimer::timeout, this, [this, address, callback, replyGuard, timeoutTimer]() {
+        if (replyGuard) {
+            qDebug() << QString("读取数据超时，地址: %1").arg(address);
+            replyGuard->deleteLater();
+        }
+        if (callback) callback(false, 0);
+        timeoutTimer->deleteLater();
+    });
+
+    // 正常完成
+    connect(reply, &QModbusReply::finished, this, [this, address, callback, replyGuard, timeoutTimer]() {
+        if (timeoutTimer) timeoutTimer->stop();
+        if (!replyGuard) {
+            if (callback) callback(false, 0);
+            return;
+        }
+        bool success = false;
+        quint16 value = 0;
+        if (replyGuard->error() == QModbusDevice::NoError) {
+            const QModbusDataUnit result = replyGuard->result();
             if (result.valueCount() > 0) {
                 value = result.value(0);
                 success = true;
-            } else {
-                qDebug() << QString("读取数据失败：无返回值，地址: %1").arg(address);
             }
         } else {
-            qDebug() << QString("读取数据失败: %1, 地址: %2").arg(reply->errorString()).arg(address);
+            qDebug() << QString("读取数据失败: %1, 地址: %2").arg(replyGuard->errorString()).arg(address);
         }
-        
-        reply->deleteLater();
-    } else {
-        // 超时
-        qDebug() << QString("读取数据超时，地址: %1").arg(address);
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        reply->deleteLater();
+        replyGuard->deleteLater();
+        if (timeoutTimer) timeoutTimer->deleteLater();
+        if (callback) callback(success, value);
+    });
+
+    timeoutTimer->start();
+}
+
+// ===== 异步批量读取连续线圈（功能码01）=====
+void PlcMonitor::readCoilsAsync(quint16 startAddress, quint16 count,
+                                const std::function<void(bool success, const QVector<quint16>& values)>& callback) {
+    if (!m_modbusClient || !m_isConnected) {
+        if (callback) callback(false, QVector<quint16>());
+        return;
     }
 
-    return success;
+    QModbusDataUnit readUnit(QModbusDataUnit::Coils, startAddress, count);
+    QModbusReply *reply = m_modbusClient->sendReadRequest(readUnit, m_deviceAddress);
+    if (!reply) {
+        if (callback) callback(false, QVector<quint16>());
+        return;
+    }
+
+    QPointer<QModbusReply> replyGuard(reply);
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    timeoutTimer->setInterval(4000);
+
+    connect(timeoutTimer, &QTimer::timeout, this, [this, callback, replyGuard, timeoutTimer]() {
+        if (replyGuard) replyGuard->deleteLater();
+        if (callback) callback(false, QVector<quint16>());
+        timeoutTimer->deleteLater();
+    });
+
+    connect(reply, &QModbusReply::finished, this, [this, callback, replyGuard, timeoutTimer]() {
+        if (timeoutTimer) timeoutTimer->stop();
+        if (!replyGuard) { if (callback) callback(false, QVector<quint16>()); return; }
+        QVector<quint16> values;
+        bool success = false;
+        if (replyGuard->error() == QModbusDevice::NoError) {
+            const QModbusDataUnit result = replyGuard->result();
+            for (int i = 0; i < result.valueCount(); ++i) {
+                values.push_back(result.value(i));
+            }
+            success = (values.size() > 0);
+        }
+        replyGuard->deleteLater();
+        if (timeoutTimer) timeoutTimer->deleteLater();
+        if (callback) callback(success, values);
+    });
+
+    timeoutTimer->start();
 }
 
 void PlcMonitor::updateConnectionStatus(bool isConnected)
@@ -616,7 +632,7 @@ int PlcMonitor::readInstrumentSelection()
     
     quint16 value;
     // 从寄存器110读取数据，使用功能码03（Holding Registers）
-    if (!readRegister(110, value, QModbusDataUnit::HoldingRegisters)) {
+    if (!readRegisterBlocking(110, value, QModbusDataUnit::HoldingRegisters)) {
         logMessage("读取仪器评选数据失败（寄存器110）", "error");
         return -1;
     }
@@ -624,6 +640,55 @@ int PlcMonitor::readInstrumentSelection()
     // 记录读取到的仪器评选数据
     logMessage(QString("读取到的仪器评选数据: %1").arg(value), "info");
     return value;
+}
+
+bool PlcMonitor::readRegisterBlocking(quint16 address, quint16& value, QModbusDataUnit::RegisterType type) {
+    if (!m_modbusClient || !m_isConnected) {
+        logMessage(QString("无法读取PLC寄存器: PLC未连接，地址: %1").arg(address), "error");
+        return false;
+    }
+
+    QModbusDataUnit readUnit(type, address, 1);
+    QModbusReply *reply = m_modbusClient->sendReadRequest(readUnit, m_deviceAddress);
+    if (!reply) {
+        logMessage(QString("向PLC寄存器%1发送读取请求失败: %2").arg(address).arg(m_modbusClient->errorString()), "error");
+        return false;
+    }
+
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    
+    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    
+    timer.start(4000);
+    loop.exec();
+
+    bool success = false;
+    if (timer.isActive()) {
+        timer.stop();
+        
+        if (reply->error() == QModbusDevice::NoError) {
+            const QModbusDataUnit result = reply->result();
+            if (result.valueCount() > 0) {
+                value = result.value(0);
+                success = true;
+            } else {
+                logMessage(QString("读取PLC寄存器失败: 数据为空，地址: %1").arg(address), "error");
+            }
+        } else {
+            logMessage(QString("读取PLC寄存器失败: %1, 地址: %2").arg(reply->errorString()).arg(address), "error");
+        }
+        
+        reply->deleteLater();
+    } else {
+        logMessage(QString("读取PLC寄存器超时，地址: %1").arg(address), "error");
+        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+        reply->deleteLater();
+    }
+
+    return success;
 }
 
 bool PlcMonitor::sendParamsToDevice(const AirTightnessFullParams& params)
@@ -1013,34 +1078,35 @@ void PlcMonitor::on_test1Button_clicked()
         return;
     }
     int test1Num = ui->test1Value->currentText().toInt();
-    bool s1 = writePlcCoilBlocking(49408, 1);
-    // 写入频道号到寄存器101
-    QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 101, 1);
-    wu.setValue(0, static_cast<quint16>(test1Num));
-    bool s2 = false;
-    if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
-        QEventLoop loop; QTimer t; t.setSingleShot(true);
-        connect(r, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        connect(&t, &QTimer::timeout, &loop, &QEventLoop::quit);
-        t.start(3000); loop.exec();
-        if (t.isActive()) { t.stop(); s2 = (r->error() == QModbusDevice::NoError); }
-        r->deleteLater();
-    }
-    if (s1 && s2) {
-        ui->test1Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test1OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage(QString("测试1开启，频道%1").arg(test1Num), "info");
-    }
+    // 异步写，不再阻塞主线程
+    writePlcCoil(49408, 1, [this, test1Num](bool s1) {
+        QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 101, 1);
+        wu.setValue(0, static_cast<quint16>(test1Num));
+        // 异步写 HoldingRegister
+        if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
+            connect(r, &QModbusReply::finished, this, [this, r, s1, test1Num]() {
+                bool s2 = (r->error() == QModbusDevice::NoError);
+                r->deleteLater();
+                if (s1 && s2) {
+                    ui->test1Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    ui->test1OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    logMessage(QString("测试1开启，频道%1").arg(test1Num), "info");
+                }
+            });
+        }
+    });
 }
 
 void PlcMonitor::on_test1OffButton_clicked()
 {
     if (!m_isConnected) return;
-    if (writePlcCoilBlocking(49408, 0)) {
-        ui->test1Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test1OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage("测试1关闭", "info");
-    }
+    writePlcCoil(49408, 0, [this](bool ok) {
+        if (ok) {
+            ui->test1Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            ui->test1OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            logMessage("测试1关闭", "info");
+        }
+    });
 }
 
 void PlcMonitor::on_test2Button_clicked()
@@ -1050,33 +1116,33 @@ void PlcMonitor::on_test2Button_clicked()
         return;
     }
     int test2Num = ui->test2Value->currentText().toInt();
-    bool s1 = writePlcCoilBlocking(49409, 1);
-    QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 102, 1);
-    wu.setValue(0, static_cast<quint16>(test2Num));
-    bool s2 = false;
-    if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
-        QEventLoop loop; QTimer t; t.setSingleShot(true);
-        connect(r, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        connect(&t, &QTimer::timeout, &loop, &QEventLoop::quit);
-        t.start(3000); loop.exec();
-        if (t.isActive()) { t.stop(); s2 = (r->error() == QModbusDevice::NoError); }
-        r->deleteLater();
-    }
-    if (s1 && s2) {
-        ui->test2Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test2OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage(QString("测试2开启，频道%1").arg(test2Num), "info");
-    }
+    writePlcCoil(49409, 1, [this, test2Num](bool s1) {
+        QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 102, 1);
+        wu.setValue(0, static_cast<quint16>(test2Num));
+        if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
+            connect(r, &QModbusReply::finished, this, [this, r, s1, test2Num]() {
+                bool s2 = (r->error() == QModbusDevice::NoError);
+                r->deleteLater();
+                if (s1 && s2) {
+                    ui->test2Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    ui->test2OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    logMessage(QString("测试2开启，频道%1").arg(test2Num), "info");
+                }
+            });
+        }
+    });
 }
 
 void PlcMonitor::on_test2OffButton_clicked()
 {
     if (!m_isConnected) return;
-    if (writePlcCoilBlocking(49409, 0)) {
-        ui->test2Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test2OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage("测试2关闭", "info");
-    }
+    writePlcCoil(49409, 0, [this](bool ok) {
+        if (ok) {
+            ui->test2Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            ui->test2OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            logMessage("测试2关闭", "info");
+        }
+    });
 }
 
 void PlcMonitor::on_test3Button_clicked()
@@ -1086,33 +1152,33 @@ void PlcMonitor::on_test3Button_clicked()
         return;
     }
     int test3Num = ui->test3Value->currentText().toInt();
-    bool s1 = writePlcCoilBlocking(49410, 1);
-    QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 103, 1);
-    wu.setValue(0, static_cast<quint16>(test3Num));
-    bool s2 = false;
-    if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
-        QEventLoop loop; QTimer t; t.setSingleShot(true);
-        connect(r, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        connect(&t, &QTimer::timeout, &loop, &QEventLoop::quit);
-        t.start(3000); loop.exec();
-        if (t.isActive()) { t.stop(); s2 = (r->error() == QModbusDevice::NoError); }
-        r->deleteLater();
-    }
-    if (s1 && s2) {
-        ui->test3Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test3OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage(QString("测试3开启，频道%1").arg(test3Num), "info");
-    }
+    writePlcCoil(49410, 1, [this, test3Num](bool s1) {
+        QModbusDataUnit wu(QModbusDataUnit::HoldingRegisters, 103, 1);
+        wu.setValue(0, static_cast<quint16>(test3Num));
+        if (QModbusReply *r = m_modbusClient->sendWriteRequest(wu, m_deviceAddress)) {
+            connect(r, &QModbusReply::finished, this, [this, r, s1, test3Num]() {
+                bool s2 = (r->error() == QModbusDevice::NoError);
+                r->deleteLater();
+                if (s1 && s2) {
+                    ui->test3Button->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    ui->test3OffButton->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+                    logMessage(QString("测试3开启，频道%1").arg(test3Num), "info");
+                }
+            });
+        }
+    });
 }
 
 void PlcMonitor::on_test3OffButton_clicked()
 {
     if (!m_isConnected) return;
-    if (writePlcCoilBlocking(49410, 0)) {
-        ui->test3Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        ui->test3OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
-        logMessage("测试3关闭", "info");
-    }
+    writePlcCoil(49410, 0, [this](bool ok) {
+        if (ok) {
+            ui->test3Button->setStyleSheet("background-color: #F44336; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            ui->test3OffButton->setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #000000; padding: 2px 15px; font-weight: bold;");
+            logMessage("测试3关闭", "info");
+        }
+    });
 }
 
 void PlcMonitor::writePlcCoil(quint16 address, int value, const std::function<void(bool)>& callback){

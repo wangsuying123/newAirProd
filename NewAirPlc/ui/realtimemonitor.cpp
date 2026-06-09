@@ -11,6 +11,8 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QDir>
+#include <QPointer>
+#include <functional>
 #include "PressureUnit.h"
 #include "LeakUnitType.h"
 #include "PLCStatusEnums.h"
@@ -994,7 +996,19 @@ void RealtimeMonitor::processMainRegisterData(const QModbusDataUnit &data)
                 quint16 highOrig = swap16(pressureHighValue); // 8709 高位原始值
                 // 合成32位值后按1000缩放
                 quint32 raw = (static_cast<quint32>(highOrig) << 16) | static_cast<quint32>(lowOrig);
-                pressure = static_cast<double>(raw) / 1000.0;
+                
+                // 压力值范围校验：防止通信异常（如寄存器全为0xFFFF）导致显示异常大值
+                double tempPressure = static_cast<double>(raw) / 1000.0;
+                if (tempPressure > MAX_PRESSURE_KPA || tempPressure < 0) {
+                    // 异常值：使用上次有效压力值，避免UI跳变
+                    logMessage(QString("检测到异常压力值: %1 KPa (原始值: 0x%2)，使用上次有效值 %3 KPa")
+                               .arg(tempPressure).arg(raw, 0, 16).arg(lastValidPressure), true);
+                    pressure = lastValidPressure;
+                } else {
+                    // 有效值：更新缓存并使用
+                    pressure = tempPressure;
+                    lastValidPressure = pressure;
+                }
 
                 // 温度值处理 - 使用公式 V=31.4853515625+R/25600（用于后续扩展）
                 Q_UNUSED(temperatureValue);
@@ -1226,35 +1240,59 @@ bool RealtimeMonitor::writeZeroToPLCRegisters() {
         return false;
     }
     
-    QList<quint16> addresses = {510, 511, 512, 513, 514, 515, 516, 49411, 49412, 49413};
+    // PLC通信的从站ID
+    quint16 plcSlaveId = 2;
+    
+    // 优化：使用功能码15（Write Multiple Coils）批量写入
+    // 把原来的10次独立请求合并为2次批量请求：
+    //   请求1：地址510开始，连续7个线圈（510-516）
+    //   请求2：地址49411开始，连续3个线圈（49411-49413）
+    // 这样大幅减少串口通信开销，避免总线拥塞
+    
+    struct BatchWrite {
+        quint16 startAddr;
+        quint16 count;
+    };
+    QList<BatchWrite> batches = {
+        {510, 7},    // 510,511,512,513,514,515,516
+        {49411, 3}   // 49411,49412,49413
+    };
+    
     bool plcWriteSuccess = true;
+    int pendingBatches = batches.size();
     
-    // PLC通信的从站ID可能与设备不同，使用PLC专用的从站ID
-    quint16 plcSlaveId = 2; // 从站地址2
-    
-    for (quint16 address : addresses) {
-        // 使用功能码05（Write Single Coil）
-        QModbusDataUnit writeUnit(QModbusDataUnit::Coils, address, 1);
-        writeUnit.setValue(0, 0); // 写入0
+    for (const auto& batch : batches) {
+        QModbusDataUnit writeUnit(QModbusDataUnit::Coils, batch.startAddr, batch.count);
+        // 全部设置为0
+        for (quint16 i = 0; i < batch.count; ++i) {
+            writeUnit.setValue(i, 0);
+        }
         
-        if (auto *reply = plcModbusClient->sendWriteRequest(writeUnit, plcSlaveId)) {
-            if (!reply->isFinished()) {
-                connect(reply, &QModbusReply::finished, reply, &QModbusReply::deleteLater);
-            } else {
-                delete reply;
-                logMessage(QString("向PLC寄存器%1写入0失败").arg(address), true);
-                plcWriteSuccess = false;
-            }
+        QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, plcSlaveId);
+        if (reply) {
+            // 异步完成回调，避免阻塞主线程
+            connect(reply, &QModbusReply::finished, reply, [this, reply, batch, &plcWriteSuccess, &pendingBatches]() {
+                if (reply->error() != QModbusDevice::NoError) {
+                    logMessage(QString("批量写入PLC寄存器失败: 地址%1开始%2个线圈, 错误=%3")
+                              .arg(batch.startAddr).arg(batch.count).arg(reply->errorString()), true);
+                    plcWriteSuccess = false;
+                }
+                pendingBatches--;
+                reply->deleteLater();
+            });
         } else {
-            logMessage(QString("向PLC寄存器%1发送写入请求失败").arg(address), true);
+            logMessage(QString("发送批量写请求失败: 地址%1开始%2个线圈").arg(batch.startAddr).arg(batch.count), true);
             plcWriteSuccess = false;
+            pendingBatches--;
         }
     }
     
+    // 注意：这里是异步写入，立即返回成功状态。
+    // 真正的写入结果由回调记录日志，不再阻塞等待。
+    // 这样避免了当 PLC 通信繁忙时调用方被卡住导致的崩溃风险。
+    
     if (!plcWriteSuccess) {
         QMessageBox::warning(this, "警告", "部分PLC寄存器写入失败，请检查连接");
-    } else {
-        // 写入成功，不输出日志
     }
     
     return plcWriteSuccess;
@@ -2029,135 +2067,138 @@ void RealtimeMonitor::handleTestResultReady3(const TestResult &result)
 }
 
 
-// 新增：汇总结果更新逻辑
-// 只有所有启用的通道都有结果且都通过，才显示合格
-// 如果有任何启用的通道失败，显示不合格
-// 如果还有启用的通道没有结果，显示等待中
+// 新增：汇总结果更新逻辑（带防抖机制）
+// 3个通道的 handleTestResultReady 可能短时间内连续调用此函数，
+// 通过延迟30ms聚合执行，避免日志里出现重复的"========= 更新汇总结果 ========="
 void RealtimeMonitor::updateSummaryResult() {
-    // 计算启用的通道数量
-    int enabledCount = 0;
-    if (ch1Enabled) enabledCount++;
-    if (ch2Enabled) enabledCount++;
-    if (ch3Enabled) enabledCount++;
-    
-    logMessage("========= 更新汇总结果 =========");
-    logMessage(QString("启用通道数: %1").arg(enabledCount));
-    logMessage(QString("通道1: 配置启用=%1, 有结果=%2, 通过=%3").arg(ch1Enabled).arg(ch1HasResult).arg(ch1Pass));
-    logMessage(QString("通道2: 配置启用=%1, 有结果=%2, 通过=%3").arg(ch2Enabled).arg(ch2HasResult).arg(ch2Pass));
-    logMessage(QString("通道3: 配置启用=%1, 有结果=%2, 通过=%3").arg(ch3Enabled).arg(ch3HasResult).arg(ch3Pass));
-    
-    // 如果没有启用任何通道，显示默认状态
-    if (enabledCount == 0) {
-        ui->summaryResultValueLabel->setText("--");
-        ui->summaryResultFrame->setStyleSheet(
-            "QFrame#summaryResultFrame {\n"
-            "    background-color: #eceff1;\n"
-            "    border: 2px solid #cfd8dc;\n"
-            "    border-radius: 10px;\n"
-            "    min-width: 140px;\n"
-            "    min-height: 50px;\n"
-            "    max-height: 50px;\n"
-            "}"
-        );
-        ui->summaryResultValueLabel->setStyleSheet(
-            "font-weight: bold;\n"
-            "color: #546e7a;\n"
-            "font-size: 16px;"
-        );
-        return;
+    // ====== 防抖核心 ======
+    // 每次调用都重置定时器：30ms内无新调用才真正执行
+    static QTimer *debounceTimer = nullptr;
+    if (!debounceTimer) {
+        debounceTimer = new QTimer();
+        debounceTimer->setSingleShot(true);
+        debounceTimer->setInterval(30);
     }
-    
-    // 检查是否有任何启用的通道失败
-    bool anyFail = false;
-    if (ch1Enabled && ch1HasResult && !ch1Pass) anyFail = true;
-    if (ch2Enabled && ch2HasResult && !ch2Pass) anyFail = true;
-    if (ch3Enabled && ch3HasResult && !ch3Pass) anyFail = true;
-    
-    // 检查所有启用的通道是否都有结果且都通过
-    bool allEnabledHaveResult = true;
-    bool allEnabledPass = true;
-    
-    if (ch1Enabled) {
-        if (!ch1HasResult) {
-            allEnabledHaveResult = false;
-        } else if (!ch1Pass) {
-            allEnabledPass = false;
-        }
-    }
-    if (ch2Enabled) {
-        if (!ch2HasResult) {
-            allEnabledHaveResult = false;
-        } else if (!ch2Pass) {
-            allEnabledPass = false;
-        }
-    }
-    if (ch3Enabled) {
-        if (!ch3HasResult) {
-            allEnabledHaveResult = false;
-        } else if (!ch3Pass) {
-            allEnabledPass = false;
-        }
-    }
+    // 断开旧连接（如果有）
+    debounceTimer->disconnect();
+    // 连接新的执行动作（用 QObject::connect 的函数指针方式）
+    QObject::connect(debounceTimer, &QTimer::timeout, this, [this]() {
+        // ========= 真正执行汇总更新 =========
 
-    if (anyFail) {
-        // 有失败的通道，显示不合格
-        logMessage("汇总结果: 不合格 (有通道失败)");
-        ui->summaryResultValueLabel->setText("不合格");
-        ui->summaryResultFrame->setStyleSheet(
-            "QFrame#summaryResultFrame {\n"
-            "    background-color: #ffebee;\n"
-            "    border: 2px solid #f44336;\n"
-            "    border-radius: 10px;\n"
-            "    min-width: 140px;\n"
-            "    min-height: 50px;\n"
-            "    max-height: 50px;\n"
-            "}"
-        );
-        ui->summaryResultValueLabel->setStyleSheet(
-            "font-weight: bold;\n"
-            "color: #c62828;\n"
-            "font-size: 16px;"
-        );
-    } else if (allEnabledHaveResult && allEnabledPass) {
-        // 所有启用的通道都有结果且都通过，显示合格
-        logMessage("汇总结果: 合格 (所有启用通道都通过)");
-        ui->summaryResultValueLabel->setText("合格");
-        ui->summaryResultFrame->setStyleSheet(
-            "QFrame#summaryResultFrame {\n"
-            "    background-color: #e8f5e9;\n"
-            "    border: 2px solid #4caf50;\n"
-            "    border-radius: 10px;\n"
-            "    min-width: 140px;\n"
-            "    min-height: 50px;\n"
-            "    max-height: 50px;\n"
-            "}"
-        );
-        ui->summaryResultValueLabel->setStyleSheet(
-            "font-weight: bold;\n"
-            "color: #2e7d32;\n"
-            "font-size: 16px;"
-        );
-    } else {
-        // 还有启用的通道没有结果，显示等待中
-        logMessage("汇总结果: 测试中 (还有通道没有结果)");
-        logMessage(QString("allEnabledHaveResult=%1, allEnabledPass=%2").arg(allEnabledHaveResult).arg(allEnabledPass));
-        ui->summaryResultValueLabel->setText("测试中");
-        ui->summaryResultFrame->setStyleSheet(
-            "QFrame#summaryResultFrame {\n"
-            "    background-color: #fff3e0;\n"
-            "    border: 2px solid #ff9800;\n"
-            "    border-radius: 10px;\n"
-            "    min-width: 140px;\n"
-            "    min-height: 50px;\n"
-            "    max-height: 50px;\n"
-            "}"
-        );
-        ui->summaryResultValueLabel->setStyleSheet(
-            "font-weight: bold;\n"
-            "color: #e65100;\n"
-            "font-size: 14px;"
-        );
-    }
+        int enabledCount = 0;
+        if (ch1Enabled) enabledCount++;
+        if (ch2Enabled) enabledCount++;
+        if (ch3Enabled) enabledCount++;
+
+        logMessage("========= 更新汇总结果 =========");
+        logMessage(QString("启用通道数: %1").arg(enabledCount));
+        logMessage(QString("通道1: 配置启用=%1, 有结果=%2, 通过=%3")
+            .arg(ch1Enabled).arg(ch1HasResult).arg(ch1Pass));
+        logMessage(QString("通道2: 配置启用=%1, 有结果=%2, 通过=%3")
+            .arg(ch2Enabled).arg(ch2HasResult).arg(ch2Pass));
+        logMessage(QString("通道3: 配置启用=%1, 有结果=%2, 通过=%3")
+            .arg(ch3Enabled).arg(ch3HasResult).arg(ch3Pass));
+
+        if (enabledCount == 0) {
+            ui->summaryResultValueLabel->setText("--");
+            ui->summaryResultFrame->setStyleSheet(
+                "QFrame#summaryResultFrame {\n"
+                "    background-color: #eceff1;\n"
+                "    border: 2px solid #cfd8dc;\n"
+                "    border-radius: 10px;\n"
+                "    min-width: 140px;\n"
+                "    min-height: 50px;\n"
+                "    max-height: 50px;\n"
+                "}"
+            );
+            ui->summaryResultValueLabel->setStyleSheet(
+                "font-weight: bold;\n"
+                "color: #546e7a;\n"
+                "font-size: 16px;"
+            );
+            return;
+        }
+
+        bool anyFail = false;
+        if (ch1Enabled && ch1HasResult && !ch1Pass) anyFail = true;
+        if (ch2Enabled && ch2HasResult && !ch2Pass) anyFail = true;
+        if (ch3Enabled && ch3HasResult && !ch3Pass) anyFail = true;
+
+        bool allEnabledHaveResult = true;
+        bool allEnabledPass = true;
+
+        if (ch1Enabled) {
+            if (!ch1HasResult) allEnabledHaveResult = false;
+            else if (!ch1Pass) allEnabledPass = false;
+        }
+        if (ch2Enabled) {
+            if (!ch2HasResult) allEnabledHaveResult = false;
+            else if (!ch2Pass) allEnabledPass = false;
+        }
+        if (ch3Enabled) {
+            if (!ch3HasResult) allEnabledHaveResult = false;
+            else if (!ch3Pass) allEnabledPass = false;
+        }
+
+        if (anyFail) {
+            logMessage("汇总结果: 不合格 (有通道失败)");
+            ui->summaryResultValueLabel->setText("不合格");
+            ui->summaryResultFrame->setStyleSheet(
+                "QFrame#summaryResultFrame {\n"
+                "    background-color: #ffebee;\n"
+                "    border: 2px solid #f44336;\n"
+                "    border-radius: 10px;\n"
+                "    min-width: 140px;\n"
+                "    min-height: 50px;\n"
+                "    max-height: 50px;\n"
+                "}"
+            );
+            ui->summaryResultValueLabel->setStyleSheet(
+                "font-weight: bold;\n"
+                "color: #c62828;\n"
+                "font-size: 16px;"
+            );
+        } else if (allEnabledHaveResult && allEnabledPass) {
+            logMessage("汇总结果: 合格 (所有启用通道都通过)");
+            ui->summaryResultValueLabel->setText("合格");
+            ui->summaryResultFrame->setStyleSheet(
+                "QFrame#summaryResultFrame {\n"
+                "    background-color: #e8f5e9;\n"
+                "    border: 2px solid #4caf50;\n"
+                "    border-radius: 10px;\n"
+                "    min-width: 140px;\n"
+                "    min-height: 50px;\n"
+                "    max-height: 50px;\n"
+                "}"
+            );
+            ui->summaryResultValueLabel->setStyleSheet(
+                "font-weight: bold;\n"
+                "color: #2e7d32;\n"
+                "font-size: 16px;"
+            );
+        } else {
+            logMessage("汇总结果: 测试中 (还有通道没有结果)");
+            logMessage(QString("allEnabledHaveResult=%1, allEnabledPass=%2")
+                .arg(allEnabledHaveResult).arg(allEnabledPass));
+            ui->summaryResultValueLabel->setText("测试中");
+            ui->summaryResultFrame->setStyleSheet(
+                "QFrame#summaryResultFrame {\n"
+                "    background-color: #fff3e0;\n"
+                "    border: 2px solid #ff9800;\n"
+                "    border-radius: 10px;\n"
+                "    min-width: 140px;\n"
+                "    min-height: 50px;\n"
+                "    max-height: 50px;\n"
+                "}"
+            );
+            ui->summaryResultValueLabel->setStyleSheet(
+                "font-weight: bold;\n"
+                "color: #e65100;\n"
+                "font-size: 14px;"
+            );
+        }
+    });
+    debounceTimer->start();
 }
 
 

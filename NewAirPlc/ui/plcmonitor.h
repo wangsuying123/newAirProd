@@ -124,6 +124,22 @@ private:
     // 调压装置Modbus客户端指针
     QModbusClient *m_pressureModbusClient;
     
+    // ========== 新增：PLC通信互斥锁，防止多请求并发堵塞总线 ==========
+    bool m_plcBusy = false;
+    // 上次轮询的缓存值（用于避免不必要的UI刷新 + 支持异步读取）
+    quint16 m_cachedD400 = 0;
+    quint16 m_cachedD402 = 0;
+    quint16 m_cachedD404 = 0;
+    quint16 m_cachedReg105 = 0;
+    quint16 m_cachedReg106 = 0;
+    quint16 m_cachedCoil1013 = 0;
+    quint16 m_cachedCoil1027 = 0;
+    quint16 m_cachedCoil1047 = 0;
+    quint16 m_cachedEn1 = 0;
+    quint16 m_cachedEn2 = 0;
+    quint16 m_cachedEn3 = 0;
+    // ========== 新增结束 ==========
+    
     // 初始化UI
     void initUI();
     
@@ -136,8 +152,16 @@ private:
     // 更新统计数据显示
     void updateStatistics();
     
-    // 读取单个寄存器值
-    bool readRegister(quint16 address, quint16 &value, QModbusDataUnit::RegisterType type = QModbusDataUnit::HoldingRegisters);
+    // 异步读取单个寄存器值（回调方式，不再阻塞主线程）
+    void readRegisterAsync(quint16 address, QModbusDataUnit::RegisterType type,
+                           const std::function<void(bool success, quint16 value)>& callback);
+    
+    // 同步阻塞版本读取单个寄存器（保留用于需要阻塞调用的场景）
+    bool readRegisterBlocking(quint16 address, quint16& value, QModbusDataUnit::RegisterType type);
+    
+    // 新增：异步批量读取连续线圈（功能码01，优化多个连续Coil读取）
+    void readCoilsAsync(quint16 startAddress, quint16 count,
+                        const std::function<void(bool success, const QVector<quint16>& values)>& callback);
     
     // 向气密仪写入数据
     bool writeAirtightRegister(quint16 address, quint16 value);

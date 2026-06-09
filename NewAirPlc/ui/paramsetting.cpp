@@ -738,7 +738,6 @@ bool ParamSetting::sendParamsToDevice()
     quint16 volumeUnitCode = static_cast<quint16>(volumeUnitToCode(volumeUnit));
     int volumeInt = ui->volumeSpinBox->value();
     quint16 volume = static_cast<quint16>(volumeInt);
-    quint16 volumeOrig = volume;
     // 需要把容积值映射到枚举编码
     {
         quint16 encoded = 0;

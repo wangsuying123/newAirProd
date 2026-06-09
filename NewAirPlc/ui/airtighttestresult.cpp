@@ -4,6 +4,9 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QTextCursor>
+#include <QThread>
+#include <functional>
+#include <memory>
 #include "PressureUnit.h"
 #include "LeakUnitType.h"
 #include "AirtightTestResultDao.h"
@@ -479,56 +482,96 @@ void AirtightTestResult::writePlcRegister(quint16 address, quint16 value, QModbu
         return;
     }
 
-    // 创建写入单元
-    QModbusDataUnit writeUnit(type, address, 1);
-    writeUnit.setValue(0, value);
+    // ====== 新增：指数退避重试机制 ======
+    // 当串口总线繁忙时，重试最多3次，延迟100ms/200ms/400ms
+    // 这是解决"写入PLC寄存器超时，地址: 510"的核心修复
+    static const int MAX_RETRIES = 3;
+    static const int BASE_DELAY_MS = 100;
+    static const int TIMEOUT_MS = 4000;
 
-    // 发送写入请求，使用从站地址2
-    QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, 2);
-    if (!reply) {
-        logMessage(QString("向PLC寄存器%1发送写入请求失败: %2").arg(address).arg(plcModbusClient->errorString()), true);
-        if (callback) callback(false);
-        return;
-    }
+    // 用shared_ptr保存重试计数器，确保在lambda链中传递状态
+    std::shared_ptr<int> retryCount = std::make_shared<int>(0);
+    std::shared_ptr<bool> completed = std::make_shared<bool>(false);
 
-    // 设置一次性定时器处理超时
-    QTimer *timeoutTimer = new QTimer(reply);
-    timeoutTimer->setSingleShot(true);
-    timeoutTimer->setInterval(2000); // 2秒超时
+    // 定义：单次写入请求的 lambda
+    std::function<void()> doWrite = nullptr;
+    doWrite = [this, address, value, type, retryCount, completed, callback, doWrite]() {
+        if (*completed) return;
 
-    // 使用QPointer保护对象生命周期，避免悬空指针
-    QPointer<AirtightTestResult> self(this);
+        QModbusDataUnit writeUnit(type, address, 1);
+        writeUnit.setValue(0, value);
 
-    connect(timeoutTimer, &QTimer::timeout, this, [self, reply, address, callback, timeoutTimer]() {
-        timeoutTimer->deleteLater();
-        if (self) {
-            self->logMessage(QString("写入PLC寄存器超时，地址: %1").arg(address), true);
-        }
-        if (callback) callback(false);
-        reply->deleteLater();
-    });
-
-    connect(reply, &QModbusReply::finished, this, [self, reply, address, value, callback, timeoutTimer]() {
-        timeoutTimer->stop();
-        timeoutTimer->deleteLater();
-
-        bool success = false;
-        if (reply->error() == QModbusDevice::NoError) {
-            if (self) {
-                self->logMessage(QString("成功向PLC寄存器%1写入%2").arg(address).arg(value), false);
+        QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, 2);
+        if (!reply) {
+            // 发送失败：重试
+            if (*retryCount < MAX_RETRIES) {
+                (*retryCount)++;
+                int delay = BASE_DELAY_MS * (1 << (*retryCount - 1));
+                logMessage(QString("向PLC寄存器%1写入请求失败(%2)，第%3次重试，延迟%4ms")
+                    .arg(address).arg(plcModbusClient->errorString()).arg(*retryCount).arg(delay), true);
+                QTimer::singleShot(delay, this, doWrite);
+            } else {
+                logMessage(QString("向PLC寄存器%1写入请求失败，已达最大重试次数").arg(address), true);
+                if (callback) callback(false);
             }
-            success = true;
-        } else {
-            if (self) {
-                self->logMessage(QString("写入PLC寄存器失败: %1, 地址: %2, 值: %3").arg(reply->errorString()).arg(address).arg(value), true);
-            }
+            return;
         }
 
-        if (callback) callback(success);
-        reply->deleteLater();
-    });
+        QTimer *timeoutTimer = new QTimer(reply);
+        timeoutTimer->setSingleShot(true);
+        timeoutTimer->setInterval(TIMEOUT_MS);
 
-    timeoutTimer->start();
+        QPointer<AirtightTestResult> self(this);
+
+        connect(timeoutTimer, &QTimer::timeout, this, [self, reply, address, value, retryCount, completed, callback, timeoutTimer, doWrite]() {
+            timeoutTimer->deleteLater();
+            if (*completed) return;
+
+            // 超时：重试
+            if (*retryCount < MAX_RETRIES) {
+                (*retryCount)++;
+                int delay = BASE_DELAY_MS * (1 << (*retryCount - 1));
+                if (self) {
+                    self->logMessage(QString("写入PLC寄存器%1超时，第%2次重试，延迟%3ms")
+                        .arg(address).arg(*retryCount).arg(delay), true);
+                }
+                reply->deleteLater();
+                QTimer::singleShot(delay, self, doWrite);
+            } else {
+                *completed = true;
+                if (self) {
+                    self->logMessage(QString("写入PLC寄存器%1超时，已达最大重试次数").arg(address), true);
+                }
+                if (callback) callback(false);
+                reply->deleteLater();
+            }
+        });
+
+        connect(reply, &QModbusReply::finished, this, [self, reply, address, value, callback, timeoutTimer, completed]() {
+            timeoutTimer->stop();
+            timeoutTimer->deleteLater();
+            if (*completed) return;
+            *completed = true;
+
+            if (reply->error() == QModbusDevice::NoError) {
+                if (self) {
+                    self->logMessage(QString("成功向PLC寄存器%1写入%2").arg(address).arg(value), false);
+                }
+                if (callback) callback(true);
+            } else {
+                if (self) {
+                    self->logMessage(QString("写入PLC寄存器失败: %1, 地址: %2, 值: %3")
+                        .arg(reply->errorString()).arg(address).arg(value), true);
+                }
+                if (callback) callback(false);
+            }
+            reply->deleteLater();
+        });
+
+        timeoutTimer->start();
+    };
+
+    doWrite();
 }
 
 bool AirtightTestResult::writePlcRegisterBlocking(quint16 address, quint16 value, QModbusDataUnit::RegisterType type) {
@@ -538,50 +581,75 @@ bool AirtightTestResult::writePlcRegisterBlocking(quint16 address, quint16 value
         return false;
     }
 
-    // 创建写入单元
-    QModbusDataUnit writeUnit(type, address, 1);
-    writeUnit.setValue(0, value);
+    static const int MAX_RETRIES = 3;
+    static const int BASE_DELAY_MS = 100;
+    static const int TIMEOUT_MS = 4000;
 
-    // 发送写入请求，使用从站地址2
-    QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, 2);
-    if (!reply) {
-        logMessage(QString("向PLC寄存器%1发送写入请求失败: %2").arg(address).arg(plcModbusClient->errorString()), true);
-        return false;
-    }
+    for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        QModbusDataUnit writeUnit(type, address, 1);
+        writeUnit.setValue(0, value);
 
-    // 等待回复或超时
-    QEventLoop loop;
-    QTimer timer;
-    timer.setSingleShot(true);
-    
-    connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    
-    timer.start(1000); // 1秒超时
-    loop.exec();
-
-    // 处理回复
-    bool success = false;
-    if (timer.isActive()) {
-        // 正常收到回复
-        timer.stop();
-        
-        if (reply->error() == QModbusDevice::NoError) {
-            logMessage(QString("成功向PLC寄存器%1写入%2").arg(address).arg(value), false);
-            success = true;
-        } else {
-            logMessage(QString("写入PLC寄存器失败: %1, 地址: %2, 值: %3").arg(reply->errorString()).arg(address).arg(value), true);
+        QModbusReply *reply = plcModbusClient->sendWriteRequest(writeUnit, 2);
+        if (!reply) {
+            if (attempt < MAX_RETRIES) {
+                int delay = BASE_DELAY_MS * (1 << attempt);
+                logMessage(QString("向PLC寄存器%1发送写入请求失败(%2)，第%3次重试，延迟%4ms")
+                    .arg(address).arg(plcModbusClient->errorString()).arg(attempt + 1).arg(delay), true);
+                QThread::msleep(delay);
+                continue;
+            }
+            logMessage(QString("向PLC寄存器%1写入请求失败，已达最大重试次数").arg(address), true);
+            return false;
         }
-        
-        reply->deleteLater();
-    } else {
-        // 超时
-        logMessage(QString("写入PLC寄存器超时，地址: %1").arg(address), true);
-        disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
-        reply->deleteLater();
+
+        QEventLoop loop;
+        QTimer timer;
+        timer.setSingleShot(true);
+
+        connect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+        connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+        timer.start(TIMEOUT_MS);
+        loop.exec();
+
+        if (timer.isActive()) {
+            timer.stop();
+            if (reply->error() == QModbusDevice::NoError) {
+                logMessage(QString("成功向PLC寄存器%1写入%2").arg(address).arg(value), false);
+                reply->deleteLater();
+                return true;
+            } else {
+                if (attempt < MAX_RETRIES) {
+                    int delay = BASE_DELAY_MS * (1 << attempt);
+                    logMessage(QString("写入PLC寄存器%1失败(%2)，第%3次重试，延迟%4ms")
+                        .arg(address).arg(reply->errorString()).arg(attempt + 1).arg(delay), true);
+                    reply->deleteLater();
+                    QThread::msleep(delay);
+                    continue;
+                }
+                logMessage(QString("写入PLC寄存器%1失败: %2").arg(address).arg(reply->errorString()), true);
+                reply->deleteLater();
+                return false;
+            }
+        } else {
+            // 超时
+            if (attempt < MAX_RETRIES) {
+                int delay = BASE_DELAY_MS * (1 << attempt);
+                logMessage(QString("写入PLC寄存器%1超时，第%2次重试，延迟%3ms")
+                    .arg(address).arg(attempt + 1).arg(delay), true);
+                disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+                reply->deleteLater();
+                QThread::msleep(delay);
+                continue;
+            }
+            logMessage(QString("写入PLC寄存器%1超时，已达最大重试次数").arg(address), true);
+            disconnect(reply, &QModbusReply::finished, &loop, &QEventLoop::quit);
+            reply->deleteLater();
+            return false;
+        }
     }
 
-    return success;
+    return false;
 }
 
 void AirtightTestResult::onInstrumentSelectionChanged(int instrumentSelection)
@@ -873,9 +941,9 @@ void AirtightTestResult::addTestResultRow(const QDateTime &timestamp, const QStr
           << new QStandardItem(productNumber)
           << new QStandardItem(alarmInfo)
           << new QStandardItem(alarmCodeText)
-          << new QStandardItem(QString::number(pressureValue))
+          << new QStandardItem(QString("%1").arg(pressureValue, 0, 'f', 6))
           << new QStandardItem(pressureUnit)
-          << new QStandardItem(QString::number(leakValue))
+          << new QStandardItem(QString("%1").arg(leakValue, 0, 'f', 6))
           << new QStandardItem(leakUnit)
           << new QStandardItem(inspector);
 
@@ -970,9 +1038,9 @@ void AirtightTestResult::exportToExcel(const QString &fileName, bool exportAll)
             out << "<td style=\"mso-number-format:\\@\">" << result.productNumber.toHtmlEscaped() << "</td>";
             out << "<td>" << result.alarmInfo.toHtmlEscaped() << "</td>";
             out << "<td>" << (result.alarmCode >= 0 ? QString::number(result.alarmCode) : "") << "</td>";
-            out << "<td style=\"mso-number-format:\\#\\,\\#\\#0\\.000;\">" << QString::number(result.pressureValue) << "</td>";
+            out << "<td style=\"mso-number-format:\\#\\,\\#\\#0\\.000;\">" << QString("%1").arg(result.pressureValue, 0, 'f', 6) << "</td>";
             out << "<td>" << result.pressureUnit.toHtmlEscaped() << "</td>";
-            out << "<td style=\"mso-number-format:\\#\\,\\#\\#0\\.000;\">" << QString::number(result.leakValue) << "</td>";
+            out << "<td style=\"mso-number-format:\\#\\,\\#\\#0\\.000;\">" << QString("%1").arg(result.leakValue, 0, 'f', 6) << "</td>";
             out << "<td>" << result.leakUnit.toHtmlEscaped() << "</td>";
             out << "<td>" << result.inspector.toHtmlEscaped() << "</td>";
             out << "</tr>\n";

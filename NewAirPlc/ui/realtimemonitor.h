@@ -94,6 +94,9 @@ private:
     quint16 m_okCount = 0;
     quint16 m_ngCount = 0;
 
+    // 新增：updateSummaryResult 防抖/去重标志，避免短时间内重复执行
+    bool m_summaryUpdateInProgress = false;
+
     void initUI();
     // 枚举定义测试进程状态
     enum ProcessStatus {
@@ -151,6 +154,9 @@ private:
     // 新增：9088高频轮询相关
     QTimer *reg9088Timer = nullptr;
     bool reg9088RequestBusy = false;
+    // 新增：压力值范围校验相关，防止通信异常时显示异常大值
+    double lastValidPressure = 0.0;          // 保存上次有效的压力值
+    const double MAX_PRESSURE_KPA = 10000.0;  // 最大合理压力值（KPa）
     // 新增：标记当前测试周期是否已处理过结果（防止重复处理旧数据）
     bool currentTestResultProcessed = false;
     // 新增：标记测试是否真正开始（经历过非排气状态）
