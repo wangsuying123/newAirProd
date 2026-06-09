@@ -13,6 +13,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QPointer>
+#include <QMutex>
+#include <QThread>
+#include <QAtomicInteger>
 #include "DatabaseManager.h"
 #include "TestResultStruct.h"
 #include "AirtightTestResultDao.h"
@@ -101,11 +104,25 @@ private:
     quint16 cachedTestChannel2 = 0;
     quint16 cachedTestChannel3 = 0;
     
+    // 线程安全相关
+    mutable QMutex m_stateMutex; // 状态保护互斥锁
+    QAtomicInteger<bool> m_isProcessing; // 原子标记：是否正在处理
+    QAtomicInteger<int> m_writeRequestCount; // 原子计数器：写入请求数
+    
+    // PLC写入重试配置
+    static constexpr int PLC_WRITE_MAX_RETRIES = 3;
+    static constexpr int PLC_WRITE_BASE_DELAY_MS = 100;
+    static constexpr int PLC_WRITE_TIMEOUT_MS = 4000;
+    
     void initUI();
     void setupTableModel();
     bool readDeviceData(quint16 address, quint16 &value, QModbusDataUnit::RegisterType type = QModbusDataUnit::HoldingRegisters);
     void logMessage(const QString &message, bool isError = false);
     void exportToExcel(const QString &fileName, bool exportAll = true);
+    void handleWriteFailure(quint16 address, quint16 value,
+                           std::shared_ptr<int> retryCount, std::shared_ptr<bool> completed,
+                           const std::function<void(bool)>& callback, std::function<void()> doWrite,
+                           const QString& errorStr, const QVector<int>& backoffDelays, int maxRetries);
     
     // 清空测试结果数据
     void clearTestData();
